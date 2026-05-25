@@ -30,7 +30,7 @@ export type UITransactionTreatment =
 
 export type StepStatus = "Not Started" | "In Progress" | "AI Completed" | "Needs Human Review" | "Approved" | "Blocked";
 export type ActorType = "AI" | "Human" | "Manager" | "System";
-export type IngestionSourceType = "CSV_EXCEL" | "SAMPLE_DATASET" | "DATABASE" | "ACCOUNTING_API" | "SUPPORTING_EVIDENCE";
+export type IngestionSourceType = "CSV_EXCEL" | "DATABASE" | "ACCOUNTING_API" | "SUPPORTING_EVIDENCE";
 export type IngestionStatus = "Not Connected" | "Ready" | "Processing" | "Imported" | "Needs Review" | "Failed";
 export type EvidenceStatus = "Valid" | "Missing" | "Needs Review" | "Unlinked" | "Rejected";
 
@@ -216,10 +216,6 @@ export const api = {
       { method: "POST", body: form }
     );
   },
-  loadSample: (periodId: number) =>
-    request<{ inserted: number; exceptions: number; review_required: number }>(`/api/filing-periods/${periodId}/load-sample`, {
-      method: "POST"
-    }),
   transactions: (periodId: number) => request<Transaction[]>(`/api/filing-periods/${periodId}/transactions`),
   exceptions: (periodId: number) => request<ExceptionItem[]>(`/api/filing-periods/${periodId}/exceptions`),
   summary: (periodId: number) => request<GstF5Summary>(`/api/filing-periods/${periodId}/gst-f5-summary`),

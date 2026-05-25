@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AuditLogItem, ExceptionItem, toUiTreatment, Transaction } from "../api";
 import TransactionDrawer from "./TransactionDrawer";
 
@@ -14,14 +14,27 @@ export default function TransactionTable({
   transactions,
   anomalies,
   audit,
+  focusTransactionId,
+  onFocusHandled,
   onRefresh
 }: {
   transactions: Transaction[];
   anomalies: ExceptionItem[];
   audit: AuditLogItem[];
+  focusTransactionId?: number | null;
+  onFocusHandled?: () => void;
   onRefresh: () => void;
 }) {
   const [selected, setSelected] = useState<Transaction | null>(null);
+
+  useEffect(() => {
+    if (!focusTransactionId) return;
+    const target = transactions.find((tx) => tx.id === focusTransactionId);
+    if (target) {
+      setSelected(target);
+      onFocusHandled?.();
+    }
+  }, [focusTransactionId, onFocusHandled, transactions]);
 
   return (
     <section className="panel overflow-hidden">

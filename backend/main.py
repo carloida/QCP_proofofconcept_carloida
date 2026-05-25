@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,11 +11,10 @@ from schemas import ApprovalRequest, ExceptionStatusRequest, FilingPeriod, Filin
 from services.audit_service import write_audit
 from services.export_service import audit_csv, exceptions_csv, gst_f5_json, transactions_csv
 from services.gst_f5_service import compute_summary
-from services.ingestion_service import ingest_csv
+from services.ingestion_service import SUPPORTED_EXTENSIONS, ingest_transactions
 from services.reconciliation_service import generate_exceptions
 
 app = FastAPI(title="GST F5 Compliance Agent Prototype")
-SAMPLE_DATA_PATH = Path(__file__).resolve().parent / "sample_data" / "sample_qcp_gst_transactions.csv"
 
 app.add_middleware(
     CORSMiddleware,
@@ -71,48 +69,22 @@ def _get_period(conn, filing_period_id: int):
 
 @app.post("/api/filing-periods/{filing_period_id}/upload")
 def upload_transactions(filing_period_id: int, file: UploadFile = File(...)):
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Upload a CSV file")
+    suffix = f".{file.filename.rsplit('.', 1)[-1].lower()}" if file.filename and "." in file.filename else ""
+    if not file.filename or suffix not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Upload a CSV, Excel, or structured PDF transaction file")
     with get_connection() as conn:
         period = _get_period(conn, filing_period_id)
         try:
-            result = ingest_csv(
+            result = ingest_transactions(
                 conn,
                 filing_period_id,
                 file.file,
+                file.filename,
                 date.fromisoformat(period["start_date"]),
                 date.fromisoformat(period["end_date"]),
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return result
-
-
-@app.post("/api/filing-periods/{filing_period_id}/load-sample")
-def load_sample_transactions(filing_period_id: int):
-    with get_connection() as conn:
-        period = _get_period(conn, filing_period_id)
-        if not SAMPLE_DATA_PATH.exists():
-            raise HTTPException(status_code=404, detail="Sample dataset not found")
-        with SAMPLE_DATA_PATH.open("rb") as sample_file:
-            result = ingest_csv(
-                conn,
-                filing_period_id,
-                sample_file,
-                date.fromisoformat(period["start_date"]),
-                date.fromisoformat(period["end_date"]),
-            )
-        write_audit(
-            conn,
-            filing_period_id,
-            Actor.SYSTEM,
-            "SAMPLE_DATASET_LOADED",
-            "Sample GST quarter loaded into the canonical transaction pipeline.",
-            affected_item="sample_qcp_gst_transactions.csv",
-            new_value=f"{result['inserted']} transactions",
-            reason="Prototype demonstration data loaded",
-            step="Step 1: Data Ingestion Hub",
-        )
         return result
 
 

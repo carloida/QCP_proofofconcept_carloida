@@ -107,6 +107,16 @@ function phaseLabel(id: number) {
   return "Approve";
 }
 
+function stageActionLabel(stage: BoardStage) {
+  if (stage.status === "Completed") {
+    if (stage.id === 14) return "Open export center";
+    return "View workspace";
+  }
+  if (stage.status === "Blocked" || stage.status === "Needs Review") return "Go to required action";
+  if (stage.status === "In Progress") return "Continue workflow";
+  return "Open workspace";
+}
+
 function buildStages(args: {
   currentStep: WorkflowStep;
   transactions: Transaction[];
@@ -116,6 +126,7 @@ function buildStages(args: {
   sourceCount: number;
 }): BoardStage[] {
   const openHigh = args.anomalies.filter((item) => item.severity === "HIGH" && (item.status ?? "Open") === "Open").length;
+  const openAny = args.anomalies.filter((item) => (item.status ?? "Open") === "Open").length;
   const lowConfidence = args.transactions.filter((tx) => tx.classification_confidence < 0.7 || tx.review_status === "NEEDS_REVIEW").length;
   const hasData = args.transactions.length > 0;
   const hasSummary = Boolean(args.summary);
@@ -128,8 +139,8 @@ function buildStages(args: {
       title: "Workflow Initialization",
       owner: "Human Accountant",
       category: "Human Review",
-      status: "Completed",
-      description: "Start quarterly GST F5 workflow, select Q2 2026, and confirm GST registration status.",
+      status: approved || args.currentStep.id > 1 || hasData ? "Completed" : "In Progress",
+      description: "Start a GST F5 workflow, create the reporting period, and confirm GST registration status.",
       requiredAction: "Confirm reporting quarter and GST registration before processing.",
       auditEvents: ["Workflow started", "Reporting quarter selected", "GST registration status confirmed"]
     },
@@ -149,16 +160,16 @@ function buildStages(args: {
       owner: "Data Ingestion Hub",
       category: "Data Ingestion",
       status: hasData ? "Completed" : "In Progress",
-      description: "Load CSV, sample data, database records, or accounting API transactions into the ingestion batch.",
+      description: "Load CSV records or connect a configured source into the ingestion batch.",
       requiredAction: hasData ? "Review import warnings and source status." : "Load at least one transaction source before GST processing can continue.",
-      auditEvents: ["Sample data load", "Column mapping", "Database preview", "API sync"]
+      auditEvents: ["CSV upload", "Column mapping", "Database configuration", "API sync"]
     },
     {
       id: 4,
       title: "Evidence Upload and Matching",
       owner: "Supporting Evidence Layer",
       category: "Evidence Validation",
-      status: "Needs Review",
+      status: approved || (hasData && !openAny) ? "Completed" : hasData ? "Needs Review" : "Not Started",
       description: "Upload tax invoices, export evidence, import permits, receipts, and credit notes; link them to transactions.",
       requiredAction: "Supporting evidence improves validation but does not replace transaction data.",
       auditEvents: ["Evidence uploaded", "Evidence linked", "Missing or unlinked evidence logged"]
@@ -178,7 +189,7 @@ function buildStages(args: {
       title: "Standardization and Validation",
       owner: "System / Workflow Engine",
       category: "System Control",
-      status: hasData ? (args.anomalies.length ? "Needs Review" : "Completed") : "Not Started",
+      status: hasData ? (openAny ? "Needs Review" : "Completed") : "Not Started",
       description: "Consolidate active source records into the canonical GST transaction schema and validate required fields.",
       requiredAction: "Human accountant reviews validation errors, mapping issues, duplicates, and source inconsistencies.",
       auditEvents: ["Canonical schema created", "Validation issues routed", "Duplicate checks completed"]
@@ -190,7 +201,7 @@ function buildStages(args: {
       category: "AI Task",
       status: hasData ? (lowConfidence ? "Needs Review" : "Completed") : "Not Started",
       description: "AI recommends GST treatment, confidence score, rule explanation, evidence status, and human review priority.",
-      requiredAction: "AI has completed initial classification. Human review is required for 6 transactions.",
+      requiredAction: hasData ? `${lowConfidence} transactions require review before computation.` : "Upload transaction data before classification can begin.",
       auditEvents: ["AI classified transactions", "Low confidence items marked for review"]
     },
     {
@@ -198,7 +209,7 @@ function buildStages(args: {
       title: "Reconciliation and Anomaly Detection",
       owner: "Reconciliation & Anomaly Detection Agent",
       category: "AI Task",
-      status: blockedByAnomaly ? "Blocked" : args.anomalies.length ? "Needs Review" : hasData ? "Completed" : "Not Started",
+      status: blockedByAnomaly ? "Blocked" : openAny ? "Needs Review" : hasData ? "Completed" : "Not Started",
       description: "Detect GST rate mismatches, duplicate invoices, missing evidence, FX gaps, out-of-period items, and Box 5/Box 7 inconsistencies.",
       requiredAction: "F5 computation is blocked until unresolved high-severity anomalies are cleared.",
       auditEvents: ["High-severity anomaly detected", "Box consistency checks completed"]
@@ -208,7 +219,7 @@ function buildStages(args: {
       title: "Human Review and Override",
       owner: "Human Accountant",
       category: "Human Review",
-      status: lowConfidence || args.anomalies.length ? "Needs Review" : hasData ? "Completed" : "Not Started",
+      status: lowConfidence || openAny ? "Needs Review" : hasData ? "Completed" : "Not Started",
       description: "Inspect transaction details, approve or override AI recommendations, resolve anomalies, and record mandatory comments.",
       requiredAction: "Review AI explanation, confidence score, evidence status, and override reason where needed.",
       auditEvents: ["Transaction reviewed by human", "Human override recorded", "Anomaly resolution logged"]
@@ -228,7 +239,7 @@ function buildStages(args: {
       title: "Accountant F5 Review",
       owner: "Human Accountant",
       category: "Human Review",
-      status: hasSummary ? "Needs Review" : "Not Started",
+      status: approved ? "Completed" : hasSummary ? "Needs Review" : "Not Started",
       description: "Review GST F5 computation summary, each box drilldown, unresolved warnings, and filing pack eligibility.",
       requiredAction: "Confirm F5 computation before generating the filing pack.",
       auditEvents: ["F5 summary opened", "F5 box drilldown reviewed"]
@@ -238,7 +249,7 @@ function buildStages(args: {
       title: "Filing Pack Generation",
       owner: "Filing Pack Generator",
       category: "AI Task",
-      status: hasSummary && !blockedByAnomaly ? "In Progress" : "Blocked",
+      status: approved ? "Completed" : hasSummary && !blockedByAnomaly ? "In Progress" : "Blocked",
       description: "Generate GST F5 summary, transaction listing, anomaly report, evidence traceability report, and audit trail export.",
       requiredAction: "Prepared for manual submission via IRAS myTax Portal. This prototype does not submit directly to IRAS.",
       auditEvents: ["Filing pack generated", "Export files prepared for manual submission"]
@@ -272,7 +283,8 @@ export default function ComplianceWorkflowBoard({
   anomalies,
   summary,
   readiness,
-  activeSourceCount
+  activeSourceCount,
+  onStageAction
 }: {
   currentStep: WorkflowStep;
   transactions: Transaction[];
@@ -280,9 +292,11 @@ export default function ComplianceWorkflowBoard({
   summary: GstF5Summary | null;
   readiness: string;
   activeSourceCount: number;
+  onStageAction?: (stageId: number) => void;
 }) {
   const [filter, setFilter] = useState<OwnerFilter>("All");
   const [viewMode, setViewMode] = useState<ViewMode>("Overview");
+  const [expanded, setExpanded] = useState(false);
   const stages = useMemo(
     () => buildStages({ currentStep, transactions, anomalies, summary, readiness, sourceCount: activeSourceCount }),
     [currentStep, transactions, anomalies, summary, readiness, activeSourceCount]
@@ -293,19 +307,43 @@ export default function ComplianceWorkflowBoard({
   const visibleStages = stages.filter((stage) => filter === "All" || ownerFilter(stage.owner) === filter);
   const blockers = stages.filter((stage) => stage.status === "Blocked").length;
   const humanStages = stages.filter((stage) => stage.category.includes("Human") && stage.status !== "Completed").length;
+  const nextStage = firstActionStage;
 
   return (
     <section className="panel overflow-hidden">
-      <div className="border-b border-line bg-surface p-4">
-        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+      <div className={`${expanded ? "border-b border-line" : ""} bg-surface p-4`}>
+        <div className="flex justify-center">
+          <button
+            className="inline-flex items-center gap-2 rounded-full border border-[#F69D39]/45 bg-white px-4 py-2 text-sm font-semibold text-ink shadow-soft transition hover:border-[#F69D39] hover:bg-[#FFF5E5] focus:outline-none focus:ring-2 focus:ring-[#F69D39]/40"
+            onClick={() => setExpanded((value) => !value)}
+            aria-expanded={expanded}
+            aria-controls="gst-workflow-board-details"
+          >
+            <span aria-hidden="true" className="grid h-5 w-5 place-items-center rounded-full bg-[#F69D39] text-sm leading-none text-white">
+              {expanded ? "-" : "+"}
+            </span>
+            {expanded ? "Collapse workflow board" : "Expand workflow board"}
+          </button>
+        </div>
+
+        <div className="mt-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9A4F10]">Human-in-the-loop compliance workflow</p>
             <h2 className="mt-2 text-lg font-semibold text-ink">GST Workflow Control Board</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-              Overview only: click a row to inspect ownership, required action, and audit events. Use the left Work Area Navigation to open the actual module below.
-            </p>
+            {expanded ? (
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
+                Overview only: click a row to inspect ownership, required action, and audit events. Use the left Work Area Navigation to open the actual module below.
+              </p>
+            ) : (
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
+                Next attention point: <span className="font-semibold text-ink">Step {nextStage.id}: {nextStage.title}</span>.
+              </p>
+            )}
           </div>
-          <div className="flex flex-wrap gap-2">
+        </div>
+
+        {expanded && (
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 rounded-md border border-line bg-white/70 p-2">
             {(["All", "Human", "AI Agents", "System", "Audit"] as OwnerFilter[]).map((item) => (
               <button
                 key={item}
@@ -317,6 +355,7 @@ export default function ComplianceWorkflowBoard({
                 {item}
               </button>
             ))}
+            <span className="mx-1 hidden h-6 w-px bg-line sm:block" />
             {(["Overview", "Detailed"] as ViewMode[]).map((item) => (
               <button
                 key={item}
@@ -329,7 +368,7 @@ export default function ComplianceWorkflowBoard({
               </button>
             ))}
           </div>
-        </div>
+        )}
         <div className="mt-4 grid gap-3 md:grid-cols-4">
           {[
             ["Current owner", currentStep.owner],
@@ -343,9 +382,24 @@ export default function ComplianceWorkflowBoard({
             </div>
           ))}
         </div>
+        {!expanded && (
+          <button
+            className="mt-3 flex w-full items-center justify-between rounded-md border border-line bg-white p-3 text-left transition hover:bg-[#FFF9EE]"
+            onClick={() => {
+              setSelectedId(nextStage.id);
+              setExpanded(true);
+            }}
+          >
+            <span>
+              <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-muted">Selected stage</span>
+              <span className="mt-1 block text-sm font-semibold text-ink">Step {nextStage.id}: {nextStage.title}</span>
+            </span>
+            <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${statusClass(nextStage.status)}`}>{nextStage.status}</span>
+          </button>
+        )}
       </div>
 
-      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      {expanded && <div id="gst-workflow-board-details" className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="overflow-hidden rounded-md border border-line bg-white">
           <div className="grid grid-cols-[72px_minmax(0,1fr)_132px] gap-3 border-b border-line bg-[#FFFBF5] px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted md:grid-cols-[84px_minmax(0,1fr)_180px_132px]">
             <span>Phase</span>
@@ -400,6 +454,11 @@ export default function ComplianceWorkflowBoard({
           <div className="mt-4 rounded-md border border-[#8B4A10]/20 bg-white/70 p-3">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5E310A]">Required action</p>
             <p className="mt-2 text-sm leading-6 text-ink">{selected.requiredAction}</p>
+            {onStageAction && (
+              <button className="button-primary mt-3 w-full" onClick={() => onStageAction(selected.id)}>
+                {stageActionLabel(selected)}
+              </button>
+            )}
           </div>
           <div className="mt-4">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5E310A]">Related audit events</p>
@@ -410,7 +469,7 @@ export default function ComplianceWorkflowBoard({
             </div>
           </div>
         </aside>
-      </div>
+      </div>}
     </section>
   );
 }

@@ -20,8 +20,8 @@ export function deriveWorkflow(
     {
       id: 1,
       title: "Data Ingestion Hub",
-      status: hasData && ingestionConfirmed ? "Approved" : hasData ? "Needs Human Review" : period ? "In Progress" : "Not Started",
-      owner: hasData && !ingestionConfirmed ? "Human Accountant" : "AI Agent",
+      status: approved ? "Approved" : hasData && ingestionConfirmed ? "Approved" : hasData ? "Needs Human Review" : period ? "In Progress" : "Not Started",
+      owner: !period || (hasData && !ingestionConfirmed) ? "Human Accountant" : "AI Agent",
       summary: hasData
         ? `${transactions.length} transactions loaded. Confirm reporting quarter, GST registration, and source readiness before standardization.`
         : "Assemble transaction data and supporting evidence for the GST F5 workflow."
@@ -53,14 +53,14 @@ export function deriveWorkflow(
     {
       id: 5,
       title: "GST F5 Computation",
-      status: !summary ? "Not Started" : lowConfidence || needsReview ? "Blocked" : f5Reviewed ? "Approved" : "AI Completed",
+      status: approved ? "Approved" : !summary ? "Not Started" : lowConfidence || needsReview ? "Blocked" : f5Reviewed ? "Approved" : "AI Completed",
       owner: f5Reviewed ? "Human Accountant" : "AI Agent",
       summary: summary ? "Box 1 to Box 8 and Box 13 computed from reviewed transaction treatments." : "Waiting for transaction review."
     },
     {
       id: 6,
       title: "Human Review and Approval",
-      status: approved ? "Approved" : summary?.approval_ready && f5Reviewed ? "Needs Human Review" : "Blocked",
+      status: !summary ? "Not Started" : approved ? "Approved" : summary.approval_ready && f5Reviewed ? "Needs Human Review" : "Blocked",
       owner: approved ? "Manager" : "Human Accountant",
       summary: approved ? "Approved for manual submission via IRAS myTax Portal." : "Human accountant approval is required before manual submission."
     },
@@ -75,7 +75,7 @@ export function deriveWorkflow(
 }
 
 export function selectCurrentStep(steps: WorkflowStep[]) {
-  return steps.find((step) => ["Blocked", "Needs Human Review", "In Progress"].includes(step.status)) ?? steps[steps.length - 1];
+  return steps.find((step) => ["Blocked", "Needs Human Review", "In Progress"].includes(step.status)) ?? steps[0];
 }
 
 export function readiness(period: FilingPeriod | null, steps: WorkflowStep[], summary: GstF5Summary | null) {

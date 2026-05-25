@@ -8,8 +8,9 @@ Important: this prototype prepares filing-ready outputs for manual submission vi
 
 ## What The Application Does
 
-- Loads quarterly GST filing data for Q2 2026 demo review.
-- Supports transaction ingestion from CSV / Excel, sample data, simulated database connectors, and simulated accounting API connectors.
+- Starts with an empty GST filing workspace.
+- Supports transaction ingestion from CSV, Excel, and structured PDF uploads.
+- Keeps database and accounting API connector surfaces empty until real integrations are configured.
 - Separates transaction data sources from supporting evidence uploads.
 - Standardizes transactions into a canonical GST schema.
 - Uses AI-style classification outputs to recommend GST treatment, confidence, evidence status, and review priority.
@@ -21,31 +22,20 @@ Important: this prototype prepares filing-ready outputs for manual submission vi
 - Maintains an audit trail for AI, system, accountant, and manager actions.
 - Generates export-ready filing pack materials for manual submission preparation.
 
-## Demo State
+## Starting State
 
-The frontend includes a polished fallback demo state so the dashboard remains useful even when the backend API is not running.
+The application opens with no filing period, no transactions, no anomalies, and no GST F5 values. Create a reporting period and upload your own transaction CSV, Excel file, or structured PDF to begin.
 
-- Reporting quarter: Q2 2026
-- GST registration: Confirmed
-- Filing readiness: Review Required
-- Current owner: Human Accountant
-- Transactions ingested: 128
-- Human reviews required: 6
-- Blocking issues: 2
-- High-severity anomalies: 2
+## Dummy Upload Files
 
-Mock GST F5 values:
+Use these clean files to try the workflow end to end:
 
-- Box 1: SGD 850,000
-- Box 2: SGD 120,000
-- Box 3: SGD 30,000
-- Box 4: SGD 1,000,000
-- Box 5: SGD 420,000
-- Box 6: SGD 76,500
-- Box 7: SGD 31,500
-- Box 8: SGD 45,000
+```text
+test_files/qcp_clean_gst_transactions.xlsx
+test_files/qcp_clean_gst_transactions.pdf
+```
 
-Box 4 equals Box 1 + Box 2 + Box 3. Box 8 equals Box 6 - Box 7.
+Both files contain six Q1 2026 GST transactions designed to pass classification, reconciliation, approval, and export without manual cleanup. The PDF is a structured transaction export with pipe-delimited rows so the prototype can parse it reliably.
 
 ## Tech Stack
 
@@ -72,7 +62,6 @@ backend/
   models.py
   schemas.py
   requirements.txt
-  sample_data/
   services/
 
 frontend/
@@ -81,7 +70,6 @@ frontend/
   src/
     App.tsx
     api.ts
-    mockData.ts
     workflow.ts
     styles.css
     components/

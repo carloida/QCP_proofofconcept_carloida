@@ -1,11 +1,10 @@
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   ColumnMapping,
   EvidenceDocument,
   FilingPeriod,
   IngestionBatch,
-  IngestionSource,
-  SourceRecordPreview
+  IngestionSource
 } from "../api";
 import ResponsibilityMatrix from "./ResponsibilityMatrix";
 import UploadPanel from "./UploadPanel";
@@ -16,7 +15,7 @@ type Confirmations = {
   sourceReady: boolean;
 };
 
-type SourceId = "csv" | "sample" | "database" | "api" | "evidence";
+type SourceId = "csv" | "database" | "api" | "evidence";
 
 type IngestionHubProps = {
   activePeriod: FilingPeriod | null;
@@ -26,9 +25,10 @@ type IngestionHubProps = {
   onConfirmationsChange: (confirmations: Confirmations) => void;
   onCreatePeriod: (payload: { name: string; start_date: string; end_date: string }) => void;
   onUpload: (file: File) => void;
-  onLoadSample: () => Promise<void>;
   onLocalAudit: (action: string, affectedItem: string, newValue: string, reason: string) => void;
   onSourceSummaryChange: (summary: string[]) => void;
+  guidedAction?: "create-period" | "upload-source" | "confirm-readiness" | null;
+  onGuidedActionHandled?: () => void;
 };
 
 const sourceCatalog: Array<{
@@ -37,13 +37,19 @@ const sourceCatalog: Array<{
   description: string;
 }> = [
   { id: "csv", title: "CSV / Excel Upload", description: "Use accounting exports from spreadsheets." },
-  { id: "sample", title: "Sample Dataset", description: "Load demo transactions for prototype testing." },
   { id: "database", title: "Database Connector", description: "Preview read-only enterprise database ingestion." },
-  { id: "api", title: "Accounting API Connector", description: "Simulate connection to Xero, QuickBooks, NetSuite, SAP, or Oracle." },
+  { id: "api", title: "Accounting API Connector", description: "Prepare a future cloud accounting integration." },
   { id: "evidence", title: "Supporting Evidence Upload", description: "Attach tax invoices, export evidence, import permits, and receipts." }
 ];
 
-const transactionSourceIds: SourceId[] = ["csv", "sample", "database", "api"];
+const transactionSourceIds: SourceId[] = ["csv", "database", "api"];
+
+const initialSources: IngestionSource[] = [
+  { id: "csv", name: "CSV / Excel Upload", type: "CSV_EXCEL", status: "Not Connected", recordCount: 0, lastUpdated: "Not updated", owner: "Human" },
+  { id: "database", name: "Database Connector", type: "DATABASE", status: "Not Connected", recordCount: 0, lastUpdated: "Not updated", owner: "System" },
+  { id: "api", name: "Accounting API Connector", type: "ACCOUNTING_API", status: "Not Connected", recordCount: 0, lastUpdated: "Not updated", owner: "System" },
+  { id: "evidence", name: "Supporting Evidence Upload", type: "SUPPORTING_EVIDENCE", status: "Not Connected", recordCount: 0, lastUpdated: "Not updated", owner: "Human" }
+];
 
 const defaultMappings: ColumnMapping[] = [
   { detectedColumn: "Invoice No.", canonicalField: "invoice_number" },
@@ -54,12 +60,6 @@ const defaultMappings: ColumnMapping[] = [
   { detectedColumn: "Total", canonicalField: "gross_amount_sgd" },
   { detectedColumn: "Posting Date", canonicalField: "posting_date" },
   { detectedColumn: "Currency", canonicalField: "currency" }
-];
-
-const previewRows: SourceRecordPreview[] = [
-  { invoice_number: "S-1001", counterparty: "Marina Analytics Pte Ltd", transaction_type: "SALE", net_amount_sgd: 12000, gst_amount_sgd: 1080, validation_status: "ready" },
-  { invoice_number: "EXP-9105", counterparty: "Seoul Electronics", transaction_type: "SALE", net_amount_sgd: 14400, gst_amount_sgd: 0, validation_status: "missing export evidence" },
-  { invoice_number: "FX-9002", counterparty: "US SaaS Vendor", transaction_type: "PURCHASE", net_amount_sgd: 2000, gst_amount_sgd: 180, validation_status: "FX conversion required" }
 ];
 
 const canonicalFields = [
@@ -97,17 +97,12 @@ export default function DataIngestionHub({
   onConfirmationsChange,
   onCreatePeriod,
   onUpload,
-  onLoadSample,
   onLocalAudit,
-  onSourceSummaryChange
+  onSourceSummaryChange,
+  guidedAction,
+  onGuidedActionHandled
 }: IngestionHubProps) {
-  const [sources, setSources] = useState<IngestionSource[]>([
-    { id: "csv", name: "CSV / Excel Upload", type: "CSV_EXCEL", status: "Not Connected", recordCount: 0, lastUpdated: "Not updated", owner: "Human" },
-    { id: "sample", name: "Sample Dataset", type: "SAMPLE_DATASET", status: "Ready", recordCount: 0, lastUpdated: "Bundled sample", owner: "System" },
-    { id: "database", name: "Database Connector", type: "DATABASE", status: "Not Connected", recordCount: 0, lastUpdated: "Not updated", owner: "System" },
-    { id: "api", name: "Accounting API Connector", type: "ACCOUNTING_API", status: "Not Connected", recordCount: 0, lastUpdated: "Not updated", owner: "System" },
-    { id: "evidence", name: "Supporting Evidence Upload", type: "SUPPORTING_EVIDENCE", status: "Not Connected", recordCount: 0, lastUpdated: "Not updated", owner: "Human" }
-  ]);
+  const [sources, setSources] = useState<IngestionSource[]>(initialSources);
   const [selectedSourceIds, setSelectedSourceIds] = useState<SourceId[]>([]);
   const [draftSelectedSourceIds, setDraftSelectedSourceIds] = useState<SourceId[]>([]);
   const [addSourceOpen, setAddSourceOpen] = useState(false);
@@ -119,11 +114,23 @@ export default function DataIngestionHub({
   const [evidenceDocs, setEvidenceDocs] = useState<EvidenceDocument[]>([]);
 
   useEffect(() => {
-    if (transactionCount > 0 && !selectedSourceIds.some((id) => transactionSourceIds.includes(id))) {
-      setSelectedSourceIds((current) => [...current, "sample"]);
-      updateSource("sample", { status: "Imported", recordCount: transactionCount });
+    setSources(initialSources.map((source) => ({ ...source })));
+    setSelectedSourceIds([]);
+    setDraftSelectedSourceIds([]);
+    setAddSourceOpen(false);
+    setShowMapping(false);
+    setShowDbPreview(false);
+    setDbConfigured(false);
+    setApiConfigured(false);
+    setApiLog([]);
+    setEvidenceDocs([]);
+  }, [activePeriod?.id]);
+
+  useEffect(() => {
+    if (transactionCount > 0 && selectedSourceIds.includes("csv")) {
+      updateSource("csv", { status: "Imported", recordCount: transactionCount });
     }
-  }, [transactionCount]);
+  }, [transactionCount, selectedSourceIds]);
 
   const activeSources = useMemo(
     () => sources.filter((source) => selectedSourceIds.includes(source.id as SourceId)),
@@ -162,9 +169,6 @@ export default function DataIngestionHub({
         if (source.id === "database" && showDbPreview && source.status !== "Imported") {
           return { batch_id: "DB", source_id: source.name, raw_records: source.recordCount, standardized_records: 0, validation_status: "preview only" };
         }
-        if (source.id === "sample") {
-          return { batch_id: "SAMPLE", source_id: source.name, raw_records: transactionCount, standardized_records: transactionCount, validation_status: transactionCount ? "ready" : "not loaded" };
-        }
         return {
           batch_id: source.id.toUpperCase(),
           source_id: source.name,
@@ -175,6 +179,39 @@ export default function DataIngestionHub({
       }),
     [activeSources, evidenceLoaded, evidenceDocs, showDbPreview, transactionCount]
   );
+
+  if (!activePeriod) {
+    return (
+      <section className="panel overflow-hidden">
+        <div className="border-b border-line bg-[#FFFBF5] p-6">
+          <span className="badge-human">New quarter</span>
+          <h2 className="mt-3 text-2xl font-semibold text-ink">Create a reporting quarter</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            Start with the period name and dates. After it is created, the workspace will guide you to choose a source and upload the GST transaction file.
+          </p>
+        </div>
+        <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_240px]">
+          <UploadPanel
+            activePeriod={activePeriod}
+            onCreatePeriod={onCreatePeriod}
+            onUpload={onUpload}
+            compact
+            showUpload={false}
+            focusAction={guidedAction === "create-period" ? "create-period" : null}
+            onFocusHandled={onGuidedActionHandled}
+          />
+          <aside className="rounded-md border border-line bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Next</p>
+            <div className="mt-3 grid gap-3 text-sm text-slate-600">
+              <p><span className="font-semibold text-ink">1.</span> Create reporting quarter</p>
+              <p><span className="font-semibold text-ink">2.</span> Upload CSV, Excel, or PDF</p>
+              <p><span className="font-semibold text-ink">3.</span> Resolve only the items that need human review</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+    );
+  }
 
   function updateSource(id: SourceId, patch: Partial<IngestionSource>) {
     setSources((current) =>
@@ -209,13 +246,6 @@ export default function DataIngestionHub({
     setDraftSelectedSourceIds([]);
   }
 
-  async function loadSample() {
-    selectSource("sample");
-    updateSource("sample", { status: "Processing" });
-    await onLoadSample();
-    updateSource("sample", { status: "Imported", recordCount: 56 });
-  }
-
   return (
     <div className="grid gap-5">
       <IngestionReadinessSummary
@@ -229,6 +259,8 @@ export default function DataIngestionHub({
         overallStatus={overallStatus}
         confirmations={confirmations}
         onConfirmationsChange={onConfirmationsChange}
+        focused={guidedAction === "confirm-readiness"}
+        onFocusHandled={onGuidedActionHandled}
       />
 
       {!selectedSourceIds.length && (
@@ -236,7 +268,8 @@ export default function DataIngestionHub({
           draftSelectedSourceIds={draftSelectedSourceIds}
           setDraftSelectedSourceIds={setDraftSelectedSourceIds}
           onContinue={continueWithSelected}
-          onLoadSample={loadSample}
+          focused={guidedAction === "upload-source"}
+          onFocusHandled={onGuidedActionHandled}
         />
       )}
 
@@ -264,15 +297,15 @@ export default function DataIngestionHub({
                 onToggleMapping={() => setShowMapping((value) => !value)}
                 onCreatePeriod={onCreatePeriod}
                 onUpload={(file) => {
-                  updateSource("csv", { status: "Imported", recordCount: transactionCount || 47 });
+                  updateSource("csv", { status: "Processing", recordCount: 0 });
                   onLocalAudit("CSV_UPLOADED", "csv_upload", file.name, "CSV or Excel source uploaded for GST processing.");
                   onUpload(file);
                 }}
                 onMappingSaved={() => onLocalAudit("COLUMN_MAPPING_SAVED", "canonical_schema", "8 mappings saved", "Map uploaded columns into canonical GST schema.")}
+                focused={guidedAction === "create-period" || guidedAction === "upload-source"}
+                focusAction={guidedAction === "create-period" || guidedAction === "upload-source" ? guidedAction : null}
+                onFocusHandled={onGuidedActionHandled}
               />
-            )}
-            {selectedSourceIds.includes("sample") && (
-              <SampleDatasetCard source={sourceById(sources, "sample")} onLoadSample={loadSample} onRemove={() => removeSource("sample")} />
             )}
             {selectedSourceIds.includes("database") && (
               <DatabaseConnectorCard
@@ -282,17 +315,17 @@ export default function DataIngestionHub({
                 onConfigure={() => setDbConfigured((value) => !value)}
                 onRemove={() => removeSource("database")}
                 onTest={() => {
-                  updateSource("database", { status: "Ready", recordCount: 120 });
+                  updateSource("database", { status: "Ready", recordCount: 0 });
                   onLocalAudit("DATABASE_CONNECTION_TESTED", "database_connector", "successful", "Database connection tested successfully.");
                 }}
                 onPreview={() => {
                   setShowDbPreview(true);
-                  updateSource("database", { status: "Ready", recordCount: 120 });
-                  onLocalAudit("DATABASE_PREVIEW_GENERATED", "database_connector", "120 preview records", "Preview generated from read-only source tables.");
+                  updateSource("database", { status: "Ready", recordCount: 0 });
+                  onLocalAudit("DATABASE_PREVIEW_OPENED", "database_connector", "empty", "Database preview opened. Connect a real source before importing.");
                 }}
                 onImport={() => {
-                  updateSource("database", { status: "Imported", recordCount: 120 });
-                  onLocalAudit("DATABASE_TABLES_IMPORTED", "database_connector", "sales, purchases, expenses, GL", "Selected tables imported into canonical staging.");
+                  updateSource("database", { status: "Needs Review", recordCount: 0 });
+                  onLocalAudit("DATABASE_IMPORT_NOT_CONFIGURED", "database_connector", "no records imported", "Connect a real database before importing source tables.");
                 }}
               />
             )}
@@ -305,13 +338,13 @@ export default function DataIngestionHub({
                 onRemove={() => removeSource("api")}
                 onConnect={() => {
                   updateSource("api", { status: "Ready", recordCount: 0 });
-                  setApiLog((log) => [`${new Date().toLocaleString()} - Xero connected`, ...log]);
-                  onLocalAudit("ACCOUNTING_API_CONNECTED", "accounting_api", "Connected", "Simulated provider OAuth completed.");
+                  setApiLog((log) => [`${new Date().toLocaleString()} - connector marked ready`, ...log]);
+                  onLocalAudit("ACCOUNTING_API_READY", "accounting_api", "Ready", "Connector placeholder prepared. Configure real API credentials before syncing.");
                 }}
                 onSync={() => {
-                  updateSource("api", { status: "Imported", recordCount: 86 });
-                  setApiLog((log) => [`${new Date().toLocaleString()} - 86 transactions synced`, ...log]);
-                  onLocalAudit("ACCOUNTING_API_SYNCED", "accounting_api", "86 records found", "Simulated transaction sync completed.");
+                  updateSource("api", { status: "Needs Review", recordCount: 0 });
+                  setApiLog((log) => [`${new Date().toLocaleString()} - no API credentials configured`, ...log]);
+                  onLocalAudit("ACCOUNTING_API_SYNC_NOT_CONFIGURED", "accounting_api", "no records synced", "Configure a real provider before syncing transactions.");
                 }}
                 onDisconnect={() => {
                   updateSource("api", { status: "Not Connected", recordCount: 0 });
@@ -344,7 +377,7 @@ export default function DataIngestionHub({
                 setEvidenceDocs((docs) => docs.map((doc) => (doc.document_id === documentId ? { ...doc, linked_transaction_id: "1", evidence_status: "Needs Review" } : doc)));
                 onLocalAudit("EVIDENCE_LINKED_TO_TRANSACTION", documentId, "transaction:1", "Evidence linked by human accountant.");
               }}
-              onOcr={(documentId) => onLocalAudit("OCR_EXTRACTION_COMPLETED", documentId, "invoice fields extracted", "Prototype OCR extraction simulated.")}
+              onOcr={(documentId) => onLocalAudit("OCR_NOT_CONFIGURED", documentId, "no extraction run", "Connect an OCR service before extracting evidence fields.")}
               onMarkValid={(documentId) => {
                 setEvidenceDocs((docs) => docs.map((doc) => (doc.document_id === documentId ? { ...doc, evidence_status: "Valid", review_status: "Approved" } : doc)));
               }}
@@ -388,7 +421,9 @@ function IngestionReadinessSummary({
   criticalIngestionIssues,
   overallStatus,
   confirmations,
-  onConfirmationsChange
+  onConfirmationsChange,
+  focused,
+  onFocusHandled
 }: {
   activePeriod: FilingPeriod | null;
   selectedCount: number;
@@ -400,7 +435,17 @@ function IngestionReadinessSummary({
   overallStatus: string;
   confirmations: Confirmations;
   onConfirmationsChange: (confirmations: Confirmations) => void;
+  focused?: boolean;
+  onFocusHandled?: () => void;
 }) {
+  const confirmationRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!focused) return;
+    confirmationRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = window.setTimeout(() => onFocusHandled?.(), 1800);
+    return () => window.clearTimeout(timer);
+  }, [focused, onFocusHandled]);
+
   const primaryMetrics = [
     ["Transactions", String(transactionCount)],
     ["Active sources", `${importedCount}/${selectedCount}`],
@@ -443,7 +488,12 @@ function IngestionReadinessSummary({
           </div>
         </div>
 
-        <div className="rounded-md border border-line bg-white p-4">
+        <div
+          ref={confirmationRef}
+          className={`rounded-md border bg-white p-4 transition ${
+            focused ? "border-[#F69D39] ring-2 ring-[#F69D39]/45 ring-offset-2 ring-offset-warm" : "border-line"
+          }`}
+        >
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Accountant confirmations</p>
           <div className="mt-3 grid gap-2">
             {[
@@ -472,22 +522,34 @@ function EmptySourceState({
   draftSelectedSourceIds,
   setDraftSelectedSourceIds,
   onContinue,
-  onLoadSample
+  focused,
+  onFocusHandled
 }: {
   draftSelectedSourceIds: SourceId[];
   setDraftSelectedSourceIds: (ids: SourceId[]) => void;
   onContinue: () => void;
-  onLoadSample: () => void;
+  focused?: boolean;
+  onFocusHandled?: () => void;
 }) {
+  const panelRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!focused) return;
+    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = window.setTimeout(() => onFocusHandled?.(), 1800);
+    return () => window.clearTimeout(timer);
+  }, [focused, onFocusHandled]);
+
   return (
-    <section className="panel p-6">
+    <section
+      ref={panelRef}
+      className={`panel p-6 transition ${focused ? "ring-2 ring-[#F69D39]/60 ring-offset-2 ring-offset-warm" : ""}`}
+    >
       <div className="mx-auto max-w-3xl text-center">
         <h2 className="text-xl font-semibold text-ink">Choose how you want to ingest GST data</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">Start with one or more sources. You can add more later.</p>
       </div>
       <SourceSelector selectedIds={draftSelectedSourceIds} onChange={setDraftSelectedSourceIds} />
       <div className="mt-5 flex flex-wrap justify-center gap-3">
-        <button className="button-primary" onClick={onLoadSample}>Use Sample Dataset</button>
         <button className="button-secondary" disabled={!draftSelectedSourceIds.length} onClick={onContinue}>Continue with Selected Sources</button>
       </div>
     </section>
@@ -544,9 +606,18 @@ function AddAnotherSourcePanel({ selectedSourceIds, onAdd, onClose }: { selected
   );
 }
 
-function SourceShell({ source, onRemove, children }: { source: IngestionSource; onRemove: () => void; children: ReactNode }) {
+function SourceShell({ source, onRemove, children, focused }: { source: IngestionSource; onRemove: () => void; children: ReactNode; focused?: boolean }) {
+  const shellRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!focused) return;
+    shellRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focused]);
+
   return (
-    <section className="panel p-5">
+    <section
+      ref={shellRef}
+      className={`panel p-5 transition ${focused ? "ring-2 ring-[#F69D39]/60 ring-offset-2 ring-offset-warm" : ""}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{source.owner}</span>
@@ -573,17 +644,27 @@ function CSVExcelUploadCard(props: {
   activePeriod: FilingPeriod | null;
   source: IngestionSource;
   showMapping: boolean;
+  focused?: boolean;
+  focusAction?: "create-period" | "upload-source" | null;
   onRemove: () => void;
   onToggleMapping: () => void;
   onCreatePeriod: IngestionHubProps["onCreatePeriod"];
   onUpload: (file: File) => void;
   onMappingSaved: () => void;
+  onFocusHandled?: () => void;
 }) {
   return (
-    <SourceShell source={props.source} onRemove={props.onRemove}>
+    <SourceShell source={props.source} onRemove={props.onRemove} focused={props.focused}>
       <p className="text-sm leading-6 text-slate-600">Accepted source types: sales invoices, purchase invoices, expense claims, GL extract. Map uploaded columns into the canonical GST schema before classification.</p>
       <div className="mt-4 rounded-md border border-line bg-slate-50 p-4">
-        <UploadPanel activePeriod={props.activePeriod} onCreatePeriod={props.onCreatePeriod} onUpload={props.onUpload} compact />
+        <UploadPanel
+          activePeriod={props.activePeriod}
+          onCreatePeriod={props.onCreatePeriod}
+          onUpload={props.onUpload}
+          compact
+          focusAction={props.focusAction}
+          onFocusHandled={props.onFocusHandled}
+        />
       </div>
       <div className="mt-4 flex flex-wrap gap-3">
         <button className="button-secondary" onClick={props.onToggleMapping}>Column mapping view</button>
@@ -611,16 +692,6 @@ function ColumnMappingPanel({ onSave }: { onSave: () => void }) {
   );
 }
 
-function SampleDatasetCard({ source, onLoadSample, onRemove }: { source: IngestionSource; onLoadSample: () => void; onRemove: () => void }) {
-  return (
-    <SourceShell source={source} onRemove={onRemove}>
-      <p className="text-sm leading-6 text-slate-600">Use sample data to demonstrate the full GST F5 workflow without uploading company files.</p>
-      <button className="button-primary mt-4" onClick={onLoadSample}>Load Sample GST Quarter</button>
-      <button className="button-secondary ml-3 mt-4" onClick={onLoadSample}>Reset Demo Data</button>
-    </SourceShell>
-  );
-}
-
 function DatabaseConnectorCard({ source, configured, showPreview, onConfigure, onRemove, onTest, onPreview, onImport }: { source: IngestionSource; configured: boolean; showPreview: boolean; onConfigure: () => void; onRemove: () => void; onTest: () => void; onPreview: () => void; onImport: () => void }) {
   return (
     <SourceShell source={source} onRemove={onRemove}>
@@ -630,9 +701,9 @@ function DatabaseConnectorCard({ source, configured, showPreview, onConfigure, o
         <>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-sm font-medium text-slate-700">Database type<select className="control"><option>PostgreSQL</option><option>MySQL</option><option>SQL Server</option><option>Snowflake</option><option>BigQuery</option></select></label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">Host<input className="control" type="password" defaultValue="finance-db.company.internal" /></label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">Database name<input className="control" defaultValue="finance_prod" /></label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">Schema<input className="control" defaultValue="accounting" /></label>
+            <label className="grid gap-1 text-sm font-medium text-slate-700">Host<input className="control" type="password" placeholder="database host" /></label>
+            <label className="grid gap-1 text-sm font-medium text-slate-700">Database name<input className="control" placeholder="database name" /></label>
+            <label className="grid gap-1 text-sm font-medium text-slate-700">Schema<input className="control" placeholder="schema" /></label>
           </div>
           <p className="mt-3 text-sm text-slate-600">Connection mode: <span className="font-semibold text-ink">Read-only</span></p>
           <p className="mt-2 text-sm text-slate-600">Tables: sales_invoices, purchase_invoices, expense_claims, vendors, customers, gl_entries</p>
@@ -652,12 +723,7 @@ function PreviewTable() {
   return (
     <div className="mt-4 rounded-md border border-line bg-white p-4">
       <h4 className="text-sm font-semibold text-ink">Preview Data</h4>
-      <div className="mt-3 grid gap-2 text-sm">
-        {previewRows.map((row) => <p key={row.invoice_number} className="rounded-md bg-slate-50 p-2">{row.invoice_number} - {row.counterparty} - {row.validation_status}</p>)}
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600 md:grid-cols-5">
-        {["120 records found", "3 missing invoice numbers", "2 duplicate records", "9 foreign currency records", "4 out-of-period records"].map((item) => <span key={item} className="rounded-md bg-slate-50 p-2">{item}</span>)}
-      </div>
+      <p className="mt-3 rounded-md border border-line bg-slate-50 p-3 text-sm text-slate-600">No database connection is configured yet.</p>
     </div>
   );
 }

@@ -8,7 +8,11 @@ export default function CompliancePanel({
   summary,
   audit,
   readiness,
-  activeSourceSummary
+  activeSourceSummary,
+  onResolveException,
+  onReviewTransaction,
+  onPrimaryAction,
+  primaryActionLabel = "Go to required action"
 }: {
   currentStep: WorkflowStep;
   transactions: Transaction[];
@@ -17,31 +21,54 @@ export default function CompliancePanel({
   audit: AuditLogItem[];
   readiness: string;
   activeSourceSummary?: string[];
+  onResolveException?: (exceptionId: number) => void;
+  onReviewTransaction?: (transactionId: number) => void;
+  onPrimaryAction?: () => void;
+  primaryActionLabel?: string;
 }) {
   const open = anomalies.filter((item) => (item.status ?? "Open") === "Open");
-  const humanActions = [
-    ...transactions.filter((tx) => tx.classification_confidence < 0.7 || tx.review_status === "NEEDS_REVIEW").slice(0, 3).map((tx) => `Review transaction ${tx.id}: ${tx.description}`),
-    ...open.filter((item) => item.severity === "HIGH").slice(0, 3).map((item) => `Resolve ${item.exception_type} on transaction ${item.transaction_id}`)
-  ];
+  const transactionActions = transactions
+    .filter((tx) => tx.classification_confidence < 0.7 || tx.review_status === "NEEDS_REVIEW")
+    .slice(0, 3)
+    .map((tx) => ({ id: tx.id, label: `Review transaction ${tx.id}: ${tx.description}` }));
+  const exceptionActions = open
+    .filter((item) => item.severity === "HIGH")
+    .slice(0, 3)
+    .map((item) => ({ id: item.id, label: `Resolve ${item.exception_type} on transaction ${item.transaction_id}` }));
 
   return (
-    <aside className="panel sticky top-4 h-fit overflow-hidden">
-      <div className="bg-[#1F2A44] p-5 text-white">
+    <aside className="panel sticky top-5 flex max-h-[calc(100vh-2.5rem)] flex-col overflow-hidden">
+      <div className="shrink-0 bg-[#1F2A44] p-5 text-white">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-white">Compliance Panel</h2>
           <span className="rounded-md border border-white/30 bg-white px-2 py-1 text-xs font-semibold text-[#1F2A44]">{readiness}</span>
         </div>
         <p className="mt-2 text-xs leading-5 text-white/75">Action queue for reviews, blockers, source status, and audit events.</p>
       </div>
-      <div className="grid gap-5 p-5">
+      <div className="grid flex-1 content-start gap-5 overflow-y-auto p-5">
         <section>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">AI summary for current step</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{currentStep.summary}</p>
+          {onPrimaryAction && (
+            <button className="button-primary mt-3 w-full" onClick={onPrimaryAction}>
+              {primaryActionLabel}
+            </button>
+          )}
         </section>
         <section>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Human required actions</p>
           <div className="mt-2 grid gap-2">
-            {humanActions.length ? humanActions.map((item) => <p key={item} className="rounded-md border border-[#F69D39]/35 bg-[#FFF5E5] p-2 text-sm text-[#9A4F10]">{item}</p>) : <p className="text-sm text-slate-500">No immediate human action required for this step.</p>}
+            {exceptionActions.map((item) => (
+              <button key={`exception-${item.id}`} className="rounded-md border border-[#F69D39]/35 bg-[#FFF5E5] p-2 text-left text-sm text-[#9A4F10] transition hover:border-[#E58B27] hover:bg-[#FFE9C7]" onClick={() => onResolveException?.(item.id)}>
+                {item.label}
+              </button>
+            ))}
+            {transactionActions.map((item) => (
+              <button key={`transaction-${item.id}`} className="rounded-md border border-[#F69D39]/35 bg-[#FFF5E5] p-2 text-left text-sm text-[#9A4F10] transition hover:border-[#E58B27] hover:bg-[#FFE9C7]" onClick={() => onReviewTransaction?.(item.id)}>
+                {item.label}
+              </button>
+            ))}
+            {!exceptionActions.length && !transactionActions.length && <p className="text-sm text-slate-500">No immediate human action required for this step.</p>}
           </div>
         </section>
         {activeSourceSummary && (

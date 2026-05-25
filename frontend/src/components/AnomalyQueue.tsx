@@ -1,13 +1,34 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { api, ExceptionItem } from "../api";
 
 const statuses = ["Open", "Resolved", "Accepted Risk", "Needs Follow Up", "Excluded From Filing"] as const;
 
-export default function AnomalyQueue({ anomalies, onRefresh }: { anomalies: ExceptionItem[]; onRefresh: () => void }) {
+export default function AnomalyQueue({
+  anomalies,
+  focusExceptionId,
+  onRefresh,
+  onFocusHandled
+}: {
+  anomalies: ExceptionItem[];
+  focusExceptionId?: number | null;
+  onRefresh: () => void;
+  onFocusHandled?: () => void;
+}) {
   const [editing, setEditing] = useState<ExceptionItem | null>(null);
   const [status, setStatus] = useState<(typeof statuses)[number]>("Resolved");
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!focusExceptionId) return;
+    const target = anomalies.find((item) => item.id === focusExceptionId);
+    if (target) {
+      setEditing(target);
+      setStatus("Resolved");
+      setError("");
+      onFocusHandled?.();
+    }
+  }, [anomalies, focusExceptionId, onFocusHandled]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();

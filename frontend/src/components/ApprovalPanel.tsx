@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { FilingPeriod, GstF5Summary } from "../api";
 
 const confirmation =
@@ -8,18 +8,33 @@ export default function ApprovalPanel({
   period,
   summary,
   f5Reviewed,
+  focusAction,
+  onFocusHandled,
   onReviewF5,
   onApprove
 }: {
   period: FilingPeriod | null;
   summary: GstF5Summary | null;
   f5Reviewed: boolean;
+  focusAction?: "review-f5" | "final-approval" | null;
+  onFocusHandled?: () => void;
   onReviewF5: () => void;
   onApprove: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [checked, setChecked] = useState(false);
   const blocked = !summary?.approval_ready || !f5Reviewed || period?.status === "APPROVED";
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!focusAction) return;
+    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (focusAction === "final-approval" && !blocked) {
+      setOpen(true);
+    }
+    const timer = window.setTimeout(() => onFocusHandled?.(), 1800);
+    return () => window.clearTimeout(timer);
+  }, [blocked, focusAction, onFocusHandled]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -30,7 +45,12 @@ export default function ApprovalPanel({
   }
 
   return (
-    <section className="panel p-5">
+    <section
+      ref={panelRef}
+      className={`panel p-5 transition ${
+        focusAction ? "ring-2 ring-[#F69D39]/60 ring-offset-2 ring-offset-warm" : ""
+      }`}
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <span className="badge-blocked">Human Approval Required</span>
@@ -38,10 +58,18 @@ export default function ApprovalPanel({
           <p className="mt-1 text-sm leading-6 text-slate-600">Human accountant approval is required before manual submission. This prototype does not submit to IRAS.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button className="button-secondary" disabled={!summary || f5Reviewed} onClick={onReviewF5}>
+          <button
+            className={`button-secondary ${focusAction === "review-f5" ? "ring-2 ring-[#F69D39]/60 ring-offset-2" : ""}`}
+            disabled={!summary || f5Reviewed}
+            onClick={onReviewF5}
+          >
             Mark F5 boxes reviewed
           </button>
-          <button className="button-primary" disabled={blocked} onClick={() => setOpen(true)}>
+          <button
+            className={`button-primary ${focusAction === "final-approval" ? "ring-2 ring-[#F69D39]/60 ring-offset-2" : ""}`}
+            disabled={blocked}
+            onClick={() => setOpen(true)}
+          >
             Final approval
           </button>
         </div>

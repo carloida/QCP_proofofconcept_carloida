@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import sqlite3
+from io import StringIO
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
+from pypdf import PdfReader
 
 from models import Actor
 from services.audit_service import write_audit
@@ -27,14 +30,42 @@ REQUIRED_COLUMNS = [
 ]
 
 
-def ingest_csv(
+SUPPORTED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".pdf"}
+
+
+def _read_pdf_table(upload_file) -> pd.DataFrame:
+    reader = PdfReader(upload_file)
+    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    rows = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and "|" in line and not line.strip().startswith("#")
+    ]
+    if not rows:
+        raise ValueError("PDF did not contain a structured transaction table.")
+    return pd.read_csv(StringIO("\n".join(rows)), sep="|")
+
+
+def _read_source_file(upload_file, filename: str) -> tuple[pd.DataFrame, str]:
+    extension = Path(filename).suffix.lower()
+    if extension == ".csv":
+        return pd.read_csv(upload_file), "CSV"
+    if extension in (".xlsx", ".xls"):
+        return pd.read_excel(upload_file), "Excel"
+    if extension == ".pdf":
+        return _read_pdf_table(upload_file), "PDF"
+    raise ValueError("Upload a CSV, Excel, or structured PDF transaction file")
+
+
+def ingest_transactions(
     conn: sqlite3.Connection,
     filing_period_id: int,
-    csv_file,
+    upload_file,
+    filename: str,
     start_date: date,
     end_date: date,
 ) -> dict:
-    df = pd.read_csv(csv_file)
+    df, source_format = _read_source_file(upload_file, filename)
     missing = [column for column in REQUIRED_COLUMNS if column not in df.columns]
     if missing:
         raise ValueError(f"Missing required columns: {', '.join(missing)}")
@@ -91,9 +122,19 @@ def ingest_csv(
 
     exceptions = generate_exceptions(conn, filing_period_id, start_date, end_date)
     conn.execute("UPDATE filing_periods SET status = 'REVIEW' WHERE id = ?", (filing_period_id,))
-    write_audit(conn, filing_period_id, Actor.SYSTEM, "FILE_UPLOADED", f"CSV uploaded with {len(df)} valid rows.")
+    write_audit(conn, filing_period_id, Actor.SYSTEM, "FILE_UPLOADED", f"{source_format} uploaded with {len(df)} valid rows.")
     write_audit(conn, filing_period_id, Actor.SYSTEM, "TRANSACTIONS_INGESTED", f"{inserted} transactions cleaned and stored.")
     write_audit(conn, filing_period_id, Actor.SYSTEM, "CLASSIFICATIONS_GENERATED", f"{inserted - review_required} auto-classified; {review_required} require review.")
     write_audit(conn, filing_period_id, Actor.SYSTEM, "EXCEPTIONS_GENERATED", f"{exceptions} reconciliation exceptions generated.")
     write_audit(conn, filing_period_id, Actor.SYSTEM, "GST_F5_RECALCULATED", "Box 1 to Box 8 summary recalculated after upload.")
     return {"inserted": inserted, "exceptions": exceptions, "review_required": review_required}
+
+
+def ingest_csv(
+    conn: sqlite3.Connection,
+    filing_period_id: int,
+    csv_file,
+    start_date: date,
+    end_date: date,
+) -> dict:
+    return ingest_transactions(conn, filing_period_id, csv_file, "transactions.csv", start_date, end_date)

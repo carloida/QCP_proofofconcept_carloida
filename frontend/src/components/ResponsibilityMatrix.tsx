@@ -5,7 +5,7 @@ const columns = [
     badgeClass: "badge-ai",
     surfaceClass: "surface-ai",
     items: [
-      "Parse uploaded or sample financial data",
+      "Parse uploaded financial data",
       "Standardize transaction fields",
       "Propose GST treatment classification",
       "Compute confidence score",
