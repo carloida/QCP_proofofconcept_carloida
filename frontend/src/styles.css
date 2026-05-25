@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #1F2A44;
+  background: #FFF5E5;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    linear-gradient(180deg, rgba(255, 245, 229, 0.96), rgba(255, 249, 238, 0.88) 36%, #ffffff 100%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@layer components {
+  .panel {
+    border: 1px solid #E5E0D8;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 18px 48px rgba(31, 42, 68, 0.08);
+  }
+
+  .control {
+    border: 1px solid #E5E0D8;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #1F2A44;
+    font-size: 0.875rem;
+    outline: none;
+    padding: 0.5rem 0.75rem;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .control:focus {
+    border-color: #F69D39;
+    box-shadow: 0 0 0 2px rgba(246, 157, 57, 0.2);
+  }
+
+  .button-primary {
+    border-radius: 6px;
+    background: #F69D39;
+    color: #1F2A44;
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    transition: background-color 150ms ease, opacity 150ms ease;
+    box-shadow: 0 10px 28px rgba(31, 42, 68, 0.06);
+  }
+
+  .button-primary:hover {
+    background: #E58B27;
+  }
+
+  .button-primary:disabled {
+    cursor: not-allowed;
+    background: #cbd5e1;
+    color: #64748b;
+  }
+
+  .button-secondary {
+    border: 1px solid #E5E0D8;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #1F2A44;
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+
+  .button-secondary:hover {
+    border-color: #E0C375;
+    background: #FFF9EE;
+  }
+
+  .button-secondary:disabled {
+    cursor: not-allowed;
+    color: #94a3b8;
+  }
+
+  .badge-human {
+    border: 1px solid rgba(246, 157, 57, 0.4);
+    border-radius: 6px;
+    background: #FFF5E5;
+    color: #9A4F10;
+    display: inline-flex;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .badge-ai {
+    border: 1px solid rgba(246, 157, 57, 0.35);
+    border-radius: 6px;
+    background: #FFF9EE;
+    color: #B36213;
+    display: inline-flex;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .badge-system {
+    border: 1px solid #E5E0D8;
+    border-radius: 6px;
+    background: #f8fafc;
+    color: #334155;
+    display: inline-flex;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .badge-audit {
+    border: 1px solid #E5E0D8;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #667085;
+    display: inline-flex;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .badge-blocked {
+    border: 1px solid rgba(217, 34, 67, 0.3);
+    border-radius: 6px;
+    background: rgba(217, 34, 67, 0.1);
+    color: #D92243;
+    display: inline-flex;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+  }
+}

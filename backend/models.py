@@ -1,0 +1,43 @@
+from enum import StrEnum
+
+
+class FilingStatus(StrEnum):
+    DRAFT = "DRAFT"
+    REVIEW = "REVIEW"
+    APPROVED = "APPROVED"
+    EXPORTED = "EXPORTED"
+
+
+class TransactionType(StrEnum):
+    SALE = "SALE"
+    PURCHASE = "PURCHASE"
+    ADJUSTMENT = "ADJUSTMENT"
+
+
+class GstTreatment(StrEnum):
+    STANDARD_RATED_SUPPLY = "STANDARD_RATED_SUPPLY"
+    ZERO_RATED_SUPPLY = "ZERO_RATED_SUPPLY"
+    EXEMPT_SUPPLY = "EXEMPT_SUPPLY"
+    OUT_OF_SCOPE_SUPPLY = "OUT_OF_SCOPE_SUPPLY"
+    TAXABLE_PURCHASE = "TAXABLE_PURCHASE"
+    DISALLOWED_INPUT_TAX = "DISALLOWED_INPUT_TAX"
+    REVERSE_CHARGE = "REVERSE_CHARGE"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+
+
+class ReviewStatus(StrEnum):
+    AUTO_CLASSIFIED = "AUTO_CLASSIFIED"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+    OVERRIDDEN = "OVERRIDDEN"
+    APPROVED = "APPROVED"
+
+
+class Severity(StrEnum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
+class Actor(StrEnum):
+    SYSTEM = "SYSTEM"
+    USER = "USER"

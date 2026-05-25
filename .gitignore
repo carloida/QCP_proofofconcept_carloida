@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.vite/
+__pycache__/
+*.py[cod]
+*.sqlite
+*.db
+*.log
+*.err.log
+.env
+.env.*
+!.env.example
+Thumbs.db
+.DS_Store
+tsconfig.tsbuildinfo
+
