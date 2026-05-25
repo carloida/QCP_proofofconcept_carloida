@@ -39,7 +39,7 @@ export default function ProcessFlowModal() {
             <div className="max-h-[82vh] overflow-auto bg-[#FFF5E5] p-6">
               <div className="mx-auto w-fit rounded-md border border-line bg-white p-4 shadow-panel">
                 <img
-                  src="/qcp-gst-f5-process-flow.svg"
+                  src="/processflow_qcp.png"
                   alt="QCP AI Agent for End-to-End GST F5 Filing Automation swimlane process flow"
                   className="h-auto max-w-none"
                   style={{ width: 560 }}
