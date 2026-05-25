@@ -401,48 +401,68 @@ function IngestionReadinessSummary({
   confirmations: Confirmations;
   onConfirmationsChange: (confirmations: Confirmations) => void;
 }) {
+  const primaryMetrics = [
+    ["Transactions", String(transactionCount)],
+    ["Active sources", `${importedCount}/${selectedCount}`],
+    ["Critical issues", String(criticalIngestionIssues)],
+    ["GST status", confirmations.gstRegistered ? "Confirmed" : "Pending"]
+  ];
+  const secondaryMetrics = [
+    `Period: ${activePeriod ? `${activePeriod.start_date} to ${activePeriod.end_date}` : "Not created"}`,
+    `Evidence: ${evidenceLoaded}`,
+    `Sources needing review: ${sourcesRequiringReview}`
+  ];
+
   return (
-    <section className="panel p-5">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <span className="badge-system">Data Ingestion</span>
-          <h2 className="mt-3 text-xl font-semibold text-ink">Step 1: Data Ingestion Hub</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Choose only the sources you need for this GST filing. Supporting evidence improves validation but does not replace transaction data.</p>
-        </div>
-        <span className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-ink">{overallStatus}</span>
-      </div>
-      <div className="mt-5 grid gap-3 md:grid-cols-4">
-        {[
-          ["GST Period", activePeriod ? `${activePeriod.start_date} to ${activePeriod.end_date}` : "Not created"],
-          ["Selected sources", String(selectedCount)],
-          ["Active sources imported", String(importedCount)],
-          ["Transactions loaded", String(transactionCount)],
-          ["Evidence documents loaded", String(evidenceLoaded)],
-          ["Sources needing review", String(sourcesRequiringReview)],
-          ["Critical ingestion issues", String(criticalIngestionIssues)],
-          ["Company GST Status", confirmations.gstRegistered ? "GST registered confirmed" : "Awaiting confirmation"]
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-md border border-line bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">{label}</p>
-            <p className="mt-2 text-sm font-semibold text-ink">{value}</p>
+    <section className="panel overflow-hidden">
+      <div className="border-b border-line bg-[#FFFBF5] p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <span className="badge-system">Data Ingestion</span>
+            <h2 className="mt-3 text-xl font-semibold text-ink">Step 1: Data Ingestion Hub</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Choose only the sources needed for this GST filing. Supporting evidence improves validation but does not replace transaction data.</p>
           </div>
-        ))}
+          <span className="rounded-md border border-[#1F2A44]/15 bg-white px-3 py-2 text-sm font-semibold text-ink">{overallStatus}</span>
+        </div>
       </div>
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
-        {[
-          ["reportingQuarter", "I confirm the reporting quarter is correct."],
-          ["gstRegistered", "I confirm the company is GST registered."],
-          ["sourceReady", "I confirm source data is ready for standardization."]
-        ].map(([key, label]) => (
-          <label key={key} className="flex gap-3 rounded-md border border-line bg-white p-3 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={confirmations[key as keyof Confirmations]}
-              onChange={(event) => onConfirmationsChange({ ...confirmations, [key]: event.target.checked })}
-            />
-            {label}
-          </label>
-        ))}
+
+      <div className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+        <div>
+          <div className="grid gap-3 md:grid-cols-4">
+            {primaryMetrics.map(([label, value]) => (
+              <div key={label} className="rounded-md border border-line bg-white p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">{label}</p>
+                <p className="mt-2 text-lg font-semibold text-ink">{value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {secondaryMetrics.map((item) => (
+              <span key={item} className="rounded-md border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-muted">{item}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-line bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Accountant confirmations</p>
+          <div className="mt-3 grid gap-2">
+            {[
+              ["reportingQuarter", "Reporting quarter is correct"],
+              ["gstRegistered", "Company is GST registered"],
+              ["sourceReady", "Source data is ready"]
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-start gap-3 rounded-md bg-[#FFFBF5] p-2 text-sm text-slate-700">
+                <input
+                  className="mt-1"
+                  type="checkbox"
+                  checked={confirmations[key as keyof Confirmations]}
+                  onChange={(event) => onConfirmationsChange({ ...confirmations, [key]: event.target.checked })}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );

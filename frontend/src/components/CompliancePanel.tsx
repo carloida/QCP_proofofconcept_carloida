@@ -25,12 +25,15 @@ export default function CompliancePanel({
   ];
 
   return (
-    <aside className="panel sticky top-4 h-fit p-5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-ink">Compliance Panel</h2>
-        <span className="rounded-md border border-[#F69D39]/35 bg-[#FFF5E5] px-2 py-1 text-xs font-semibold text-[#9A4F10]">{readiness}</span>
+    <aside className="panel sticky top-4 h-fit overflow-hidden">
+      <div className="bg-[#1F2A44] p-5 text-white">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-white">Compliance Panel</h2>
+          <span className="rounded-md border border-white/30 bg-white px-2 py-1 text-xs font-semibold text-[#1F2A44]">{readiness}</span>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-white/75">Action queue for reviews, blockers, source status, and audit events.</p>
       </div>
-      <div className="mt-5 grid gap-5">
+      <div className="grid gap-5 p-5">
         <section>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">AI summary for current step</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{currentStep.summary}</p>

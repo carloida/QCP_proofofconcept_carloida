@@ -8,6 +8,7 @@ import ComplianceWorkflowBoard from "./components/ComplianceWorkflowBoard";
 import DataIngestionHub from "./components/DataIngestionHub";
 import ExportCenter from "./components/ExportCenter";
 import F5SummaryPanel from "./components/F5SummaryPanel";
+import ProcessFlowModal from "./components/ProcessFlowModal";
 import StatusBanner from "./components/StatusBanner";
 import TransactionTable from "./components/TransactionTable";
 import WorkflowStepper from "./components/WorkflowStepper";
@@ -22,6 +23,32 @@ type AppData = {
   summary: GstF5Summary | null;
   audit: AuditLogItem[];
 };
+
+function NavigationGuide() {
+  return (
+    <section className="panel p-4">
+      <div className="grid gap-3 lg:grid-cols-[1.1fr_1fr_1fr_1fr]">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9A4F10]">How to navigate</p>
+          <h2 className="mt-1 text-base font-semibold text-ink">Start with the left navigation, then review the center workspace.</h2>
+        </div>
+        {[
+          ["1", "Work Area Steps", "Click a step on the left to open ingestion, transactions, anomalies, F5 computation, approval, or export."],
+          ["2", "Control Board", "Use the center board to understand the end-to-end process and inspect ownership or required actions."],
+          ["3", "Compliance Panel", "Use the right panel as your action queue for reviews, blockers, active sources, and audit events."]
+        ].map(([number, title, body]) => (
+          <div key={title} className="rounded-md border border-line bg-[#FFFBF5] p-3">
+            <div className="flex items-center gap-2">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-[#F69D39] text-xs font-bold text-ink">{number}</span>
+              <p className="text-sm font-semibold text-ink">{title}</p>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-muted">{body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export default function App() {
   const [data, setData] = useState<AppData>({
@@ -273,6 +300,8 @@ export default function App() {
           highSeverityAnomalies={highSeverityAnomalies}
           transactionCount={data.transactions.length}
         />
+        <ProcessFlowModal />
+        <NavigationGuide />
 
         <div className="grid gap-5 xl:grid-cols-[310px_minmax(0,1fr)_360px]">
           <WorkflowStepper steps={steps} activeStepId={currentStep.id} onSelect={setActiveStepId} />
@@ -294,6 +323,16 @@ export default function App() {
               readiness={filingReadiness}
               activeSourceCount={activeSourceSummary.length}
             />
+            <section className="panel border-l-4 border-l-accent p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9A4F10]">Active workspace</p>
+              <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-ink">Step {currentStep.id}: {currentStep.title}</h2>
+                  <p className="mt-1 text-sm leading-6 text-muted">{currentStep.summary}</p>
+                </div>
+                <span className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-ink">{currentStep.owner}</span>
+              </div>
+            </section>
             {renderStep()}
           </section>
           <CompliancePanel currentStep={currentStep} transactions={data.transactions} anomalies={data.exceptions} summary={data.summary} audit={mergedAudit} readiness={filingReadiness} activeSourceSummary={activeSourceSummary} />

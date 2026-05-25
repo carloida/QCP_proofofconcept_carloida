@@ -90,10 +90,10 @@ textarea {
   }
 
   .badge-human {
-    border: 1px solid rgba(246, 157, 57, 0.4);
+    border: 1px solid rgba(224, 195, 117, 0.85);
     border-radius: 6px;
-    background: #FFF5E5;
-    color: #9A4F10;
+    background: #FFF7DC;
+    color: #765719;
     display: inline-flex;
     font-size: 0.75rem;
     font-weight: 600;
@@ -101,10 +101,10 @@ textarea {
   }
 
   .badge-ai {
-    border: 1px solid rgba(246, 157, 57, 0.35);
+    border: 1px solid rgba(59, 130, 246, 0.35);
     border-radius: 6px;
-    background: #FFF9EE;
-    color: #B36213;
+    background: #EAF3FF;
+    color: #1D4F8F;
     display: inline-flex;
     font-size: 0.75rem;
     font-weight: 600;
@@ -123,10 +123,10 @@ textarea {
   }
 
   .badge-audit {
-    border: 1px solid #E5E0D8;
+    border: 1px solid #B8C3D8;
     border-radius: 6px;
-    background: #ffffff;
-    color: #667085;
+    background: #F2F5FA;
+    color: #344054;
     display: inline-flex;
     font-size: 0.75rem;
     font-weight: 600;
@@ -142,5 +142,25 @@ textarea {
     font-size: 0.75rem;
     font-weight: 600;
     padding: 0.25rem 0.5rem;
+  }
+
+  .surface-ai {
+    border: 1px solid rgba(59, 130, 246, 0.28);
+    background: #F2F8FF;
+  }
+
+  .surface-human {
+    border: 1px solid rgba(224, 195, 117, 0.75);
+    background: #FFF9E8;
+  }
+
+  .surface-approval {
+    border: 1px solid rgba(217, 34, 67, 0.28);
+    background: #FFF0F3;
+  }
+
+  .surface-audit {
+    border: 1px solid #C8D1E1;
+    background: #F7F9FC;
   }
 }

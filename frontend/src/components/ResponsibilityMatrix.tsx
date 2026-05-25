@@ -2,6 +2,8 @@ const columns = [
   {
     title: "AI handles",
     badge: "AI Task",
+    badgeClass: "badge-ai",
+    surfaceClass: "surface-ai",
     items: [
       "Parse uploaded or sample financial data",
       "Standardize transaction fields",
@@ -16,6 +18,8 @@ const columns = [
   {
     title: "Human accountant handles",
     badge: "Human Review",
+    badgeClass: "badge-human",
+    surfaceClass: "surface-human",
     items: [
       "Confirm reporting quarter",
       "Confirm GST registration status",
@@ -29,11 +33,15 @@ const columns = [
   {
     title: "Manager handles",
     badge: "Human Approval Required",
+    badgeClass: "badge-blocked",
+    surfaceClass: "surface-approval",
     items: ["Final sign-off before manual filing"]
   },
   {
     title: "System handles",
     badge: "System Audit",
+    badgeClass: "badge-audit",
+    surfaceClass: "surface-audit",
     items: ["Audit logging", "Version tracking", "Export records"]
   }
 ];
@@ -50,8 +58,8 @@ export default function ResponsibilityMatrix() {
       </div>
       <div className="mt-4 grid gap-3 lg:grid-cols-4">
         {columns.map((column) => (
-          <article key={column.title} className="rounded-md border border-line bg-surface p-4">
-            <span className={column.badge.includes("Human") ? "badge-human" : column.badge.includes("AI") ? "badge-ai" : "badge-audit"}>{column.badge}</span>
+          <article key={column.title} className={`rounded-md p-4 ${column.surfaceClass}`}>
+            <span className={column.badgeClass}>{column.badge}</span>
             <h3 className="mt-3 text-sm font-semibold text-ink">{column.title}</h3>
             <ul className="mt-3 space-y-2 text-sm leading-5 text-slate-600">
               {column.items.map((item) => (

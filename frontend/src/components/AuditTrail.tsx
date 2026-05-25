@@ -4,7 +4,7 @@ export default function AuditTrail({ audit }: { audit: AuditLogItem[] }) {
   return (
     <section className="panel overflow-hidden">
       <div className="border-b border-line p-5">
-        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700">System Audit</span>
+        <span className="badge-audit">System Audit</span>
         <h2 className="mt-3 text-lg font-semibold text-ink">Audit Trail</h2>
         <p className="mt-1 text-sm text-slate-600">Chronological evidence of ingestion, classification, human review, anomaly decisions, F5 computation, approval, and exports.</p>
       </div>

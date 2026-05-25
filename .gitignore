@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .vite/
+.venv/
 __pycache__/
 *.py[cod]
 *.sqlite
@@ -13,4 +14,3 @@ __pycache__/
 Thumbs.db
 .DS_Store
 tsconfig.tsbuildinfo
-

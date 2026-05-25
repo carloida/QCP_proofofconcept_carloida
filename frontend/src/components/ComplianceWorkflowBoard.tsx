@@ -46,10 +46,27 @@ function ownerFilter(owner: ProcessOwner): OwnerFilter {
 }
 
 function ownerBadge(owner: ProcessOwner) {
-  if (owner === "Human Accountant" || owner === "Manager / Final Approver") return "badge-human";
+  if (owner === "Manager / Final Approver") return "badge-blocked";
+  if (owner === "Human Accountant") return "badge-human";
   if (owner.includes("Agent") || owner === "Filing Pack Generator") return "badge-ai";
   if (owner === "System Audit Trail") return "badge-audit";
   return "badge-system";
+}
+
+function categoryBadge(category: ResponsibilityCategory) {
+  if (category === "AI Task" || category === "Computation") return "badge-ai";
+  if (category === "Human Review") return "badge-human";
+  if (category === "Human Approval Required") return "badge-blocked";
+  if (category === "System Audit") return "badge-audit";
+  return "badge-system";
+}
+
+function filterClass(item: OwnerFilter, active: boolean) {
+  if (!active) return "border-line bg-white text-muted hover:bg-warm";
+  if (item === "AI Agents") return "border-[#3B82F6] bg-[#EAF3FF] text-[#1D4F8F]";
+  if (item === "Human") return "border-[#E0C375] bg-[#FFF7DC] text-[#765719]";
+  if (item === "Audit") return "border-[#B8C3D8] bg-[#F2F5FA] text-[#344054]";
+  return "border-[#F69D39] bg-[#F69D39] text-ink";
 }
 
 function statusClass(status: BoardStatus) {
@@ -65,6 +82,29 @@ function statusClass(status: BoardStatus) {
     default:
       return "border-line bg-slate-50 text-muted";
   }
+}
+
+function statusDot(status: BoardStatus) {
+  switch (status) {
+    case "Blocked":
+      return "bg-risk";
+    case "Needs Review":
+      return "bg-accent";
+    case "Completed":
+      return "bg-[#E0C375]";
+    case "In Progress":
+      return "bg-[#F69D39]";
+    default:
+      return "bg-slate-300";
+  }
+}
+
+function phaseLabel(id: number) {
+  if (id <= 3) return "Ingest";
+  if (id <= 6) return "Validate";
+  if (id <= 9) return "Review";
+  if (id <= 12) return "Compute";
+  return "Approve";
 }
 
 function buildStages(args: {
@@ -262,7 +302,7 @@ export default function ComplianceWorkflowBoard({
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9A4F10]">Human-in-the-loop compliance workflow</p>
             <h2 className="mt-2 text-lg font-semibold text-ink">GST Workflow Control Board</h2>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-              AI-assisted GST F5 preparation with accountant review, override authority, manager approval, and audit logging at every control point.
+              Overview only: click a row to inspect ownership, required action, and audit events. Use the left Work Area Navigation to open the actual module below.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -270,7 +310,7 @@ export default function ComplianceWorkflowBoard({
               <button
                 key={item}
                 className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
-                  filter === item ? "border-[#F69D39] bg-[#F69D39] text-ink" : "border-line bg-white text-muted hover:bg-warm"
+                  filterClass(item, filter === item)
                 }`}
                 onClick={() => setFilter(item)}
               >
@@ -305,49 +345,67 @@ export default function ComplianceWorkflowBoard({
         </div>
       </div>
 
-      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="overflow-hidden rounded-md border border-line bg-white">
+          <div className="grid grid-cols-[72px_minmax(0,1fr)_132px] gap-3 border-b border-line bg-[#FFFBF5] px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted md:grid-cols-[84px_minmax(0,1fr)_180px_132px]">
+            <span>Phase</span>
+            <span>Workflow stage</span>
+            <span className="hidden md:block">Owner</span>
+            <span>Status</span>
+          </div>
           {visibleStages.map((stage) => (
             <button
               key={stage.id}
-              className={`border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${
-                selected.id === stage.id ? "border-[#F69D39] bg-[#FFF9EE]" : stage.status === "Blocked" ? "border-[#D92243]/45 bg-[#D92243]/5" : "border-line bg-white"
+              className={`relative grid w-full grid-cols-[72px_minmax(0,1fr)_132px] gap-3 border-b px-4 py-3 text-left transition last:border-b-0 hover:bg-[#FFF9EE] md:grid-cols-[84px_minmax(0,1fr)_180px_132px] ${
+                selected.id === stage.id
+                  ? "border-[#F69D39]/45 bg-[#FFF1D8] shadow-[inset_4px_0_0_#F69D39,0_6px_18px_rgba(31,42,68,0.06)]"
+                  : stage.status === "Blocked"
+                    ? "border-line bg-[#D92243]/[0.035]"
+                    : "border-line bg-white"
               }`}
-              style={{ borderRadius: 8 }}
               onClick={() => setSelectedId(stage.id)}
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#FFF5E5] text-xs font-bold text-ink">{stage.id}</span>
+                <span className="hidden text-xs font-semibold text-muted sm:inline">{phaseLabel(stage.id)}</span>
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot(stage.status)}`} />
+                  <h3 className={`truncate text-sm text-ink ${selected.id === stage.id ? "font-bold" : "font-semibold"}`}>{stage.title}</h3>
+                </div>
+                <p className="mt-1 truncate text-xs text-muted">{stage.category}</p>
+                {viewMode === "Detailed" && <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted">{stage.description}</p>}
+              </div>
+              <div className="hidden min-w-0 md:block">
+                <p className="truncate text-sm font-medium text-ink">{stage.owner}</p>
+                <p className="mt-1 truncate text-xs text-muted">{ownerFilter(stage.owner)}</p>
+              </div>
+              <div className="flex items-start justify-end">
                 <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${statusClass(stage.status)}`}>{stage.status}</span>
               </div>
-              <h3 className="mt-2 text-sm font-semibold text-ink">{stage.title}</h3>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <span className={ownerBadge(stage.owner)}>{stage.owner}</span>
-                <span className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-muted">{stage.category}</span>
-              </div>
-              {viewMode === "Detailed" && <p className="mt-2 text-xs leading-5 text-muted">{stage.description}</p>}
-              {stage.status === "Blocked" && <p className="mt-2 text-xs font-semibold text-risk">Blocks final approval.</p>}
             </button>
           ))}
         </div>
 
-        <aside className="rounded-md border border-line bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Selected workflow card</p>
-          <h3 className="mt-2 text-lg font-semibold text-ink">{selected.title}</h3>
+        <aside className="h-fit rounded-md border border-[#D98422]/45 bg-[#F4B15E] p-4 shadow-[0_18px_36px_rgba(154,79,16,0.16)] xl:sticky xl:top-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#5E310A]">Selected stage</p>
+          <h3 className="mt-2 text-lg font-semibold text-ink">{selected.id}. {selected.title}</h3>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className={ownerBadge(selected.owner)}>{selected.owner}</span>
-            <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${statusClass(selected.status)}`}>{selected.status}</span>
+            <span className={categoryBadge(selected.category)}>{selected.category}</span>
+            <span className="rounded-md border border-[#8B4A10]/25 bg-[#FFF5E5] px-2 py-1 text-xs font-semibold text-[#5E310A]">{selected.status}</span>
           </div>
-          <p className="mt-4 text-sm leading-6 text-muted">{selected.description}</p>
-          <div className="mt-4 rounded-md border border-[#E0C375]/60 bg-[#FFF5E5] p-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8B6B18]">Required action</p>
+          <p className="mt-4 text-sm leading-6 text-[#4C2A0B]">{selected.description}</p>
+          <div className="mt-4 rounded-md border border-[#8B4A10]/20 bg-white/70 p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5E310A]">Required action</p>
             <p className="mt-2 text-sm leading-6 text-ink">{selected.requiredAction}</p>
           </div>
           <div className="mt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Related audit events</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5E310A]">Related audit events</p>
             <div className="mt-2 grid gap-2">
               {selected.auditEvents.map((event) => (
-                <p key={event} className="rounded-md border border-line bg-slate-50 p-2 text-sm text-muted">{event}</p>
+                <p key={event} className="rounded-md border border-[#8B4A10]/15 bg-white/65 p-2 text-sm text-[#4C2A0B]">{event}</p>
               ))}
             </div>
           </div>
