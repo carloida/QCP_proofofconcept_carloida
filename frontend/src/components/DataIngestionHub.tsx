@@ -6,7 +6,6 @@ import {
   IngestionBatch,
   IngestionSource
 } from "../api";
-import ResponsibilityMatrix from "./ResponsibilityMatrix";
 import UploadPanel from "./UploadPanel";
 
 type Confirmations = {
@@ -60,33 +59,6 @@ const defaultMappings: ColumnMapping[] = [
   { detectedColumn: "Total", canonicalField: "gross_amount_sgd" },
   { detectedColumn: "Posting Date", canonicalField: "posting_date" },
   { detectedColumn: "Currency", canonicalField: "currency" }
-];
-
-const canonicalFields = [
-  "transaction_id",
-  "source_system",
-  "source_record_id",
-  "ingestion_batch_id",
-  "document_id",
-  "transaction_date",
-  "posting_date",
-  "invoice_number",
-  "supplier_name",
-  "customer_name",
-  "supplier_gst_registered",
-  "customer_country",
-  "description",
-  "transaction_type",
-  "currency",
-  "exchange_rate_to_sgd",
-  "net_amount_sgd",
-  "gst_amount_sgd",
-  "gross_amount_sgd",
-  "tax_code_from_source",
-  "ai_gst_treatment",
-  "confidence_score",
-  "evidence_status",
-  "approval_status"
 ];
 
 export default function DataIngestionHub({
@@ -401,8 +373,6 @@ export default function DataIngestionHub({
       )}
 
       {!!selectedSourceIds.length && <SourcePipelineStatus rows={pipelineRows} />}
-      <CanonicalSchemaPanel />
-      <ResponsibilityMatrix />
     </div>
   );
 }
@@ -784,22 +754,6 @@ function EvidenceTable({ documents, onLinkEvidence, onOcr, onMarkValid, onReject
         </tbody>
       </table>
     </div>
-  );
-}
-
-function CanonicalSchemaPanel() {
-  const [open, setOpen] = useState(false);
-  return (
-    <section className="panel p-5">
-      <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen((value) => !value)}>
-        <div>
-          <h3 className="text-lg font-semibold text-ink">Canonical GST Transaction Schema</h3>
-          <p className="mt-1 text-sm text-slate-600">Regardless of source, every record is converted into one GST-ready schema before AI classification.</p>
-        </div>
-        <span className="button-secondary px-3 py-1">{open ? "Hide" : "Show"}</span>
-      </button>
-      {open && <div className="mt-4 flex flex-wrap gap-2">{canonicalFields.map((field) => <span key={field} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{field}</span>)}</div>}
-    </section>
   );
 }
 

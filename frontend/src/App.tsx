@@ -3,16 +3,19 @@ import { api, AuditLogItem, ExceptionItem, FilingPeriod, GstF5Summary, Transacti
 import AnomalyQueue from "./components/AnomalyQueue";
 import ApprovalPanel from "./components/ApprovalPanel";
 import AuditTrail from "./components/AuditTrail";
-import CompliancePanel from "./components/CompliancePanel";
+import CompliancePanel, { ComplianceAction } from "./components/CompliancePanel";
 import ComplianceWorkflowBoard from "./components/ComplianceWorkflowBoard";
 import DataIngestionHub from "./components/DataIngestionHub";
 import ExportCenter from "./components/ExportCenter";
 import F5SummaryPanel from "./components/F5SummaryPanel";
+import ImpactEvaluationPanel from "./components/ImpactEvaluationPanel";
 import ProcessFlowModal from "./components/ProcessFlowModal";
 import StatusBanner from "./components/StatusBanner";
 import TransactionTable from "./components/TransactionTable";
+import WorkflowReferencePanel, { WorkflowReferenceDetails } from "./components/WorkflowReferencePanel";
 import WorkflowStepper from "./components/WorkflowStepper";
-import { deriveWorkflow, readiness, selectCurrentStep } from "./workflow";
+import { calculateImpactMetrics } from "./metrics";
+import { deriveWorkflow, isComputedF5Summary, readiness, selectCurrentStep } from "./workflow";
 
 type AppData = {
   periods: FilingPeriod[];
@@ -56,6 +59,8 @@ export default function App() {
   const [focusExceptionId, setFocusExceptionId] = useState<number | null>(null);
   const [focusTransactionId, setFocusTransactionId] = useState<number | null>(null);
   const [guidedAction, setGuidedAction] = useState<GuidedAction | null>("create-period");
+  const [referenceOpen, setReferenceOpen] = useState(false);
+  const [referenceView, setReferenceView] = useState<"Schema" | "Owners">("Schema");
   const workspaceRef = useRef<HTMLElement | null>(null);
 
   const refresh = useCallback(async (periodId?: number) => {
@@ -109,13 +114,14 @@ export default function App() {
 
   const mergedAudit = useMemo(() => [...data.audit, ...localAudit].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()), [data.audit, localAudit]);
   const ingestionReady = ingestionConfirmations.reportingQuarter && ingestionConfirmations.gstRegistered && ingestionConfirmations.sourceReady;
-  const steps = useMemo(() => deriveWorkflow(data.activePeriod, data.transactions, data.exceptions, data.summary, f5Reviewed, ingestionReady), [data, f5Reviewed, ingestionReady]);
+  const effectiveSummary = isComputedF5Summary(data.summary) ? data.summary : null;
+  const steps = useMemo(() => deriveWorkflow(data.activePeriod, data.transactions, data.exceptions, effectiveSummary, f5Reviewed, ingestionReady), [data.activePeriod, data.transactions, data.exceptions, effectiveSummary, f5Reviewed, ingestionReady]);
   const currentStep = steps.find((step) => step.id === activeStepId) ?? selectCurrentStep(steps);
   const systemCurrentStep = selectCurrentStep(steps);
   const highSeverityAnomalies = data.exceptions.filter((item) => item.severity === "HIGH" && (item.status ?? "Open") === "Open").length;
-  const humanReviewsRequired = data.summary?.needs_review_count ?? 0;
+  const humanReviewsRequired = effectiveSummary?.needs_review_count ?? 0;
   const blockingIssues = highSeverityAnomalies;
-  const filingReadiness = readiness(data.activePeriod, steps, data.summary);
+  const filingReadiness = readiness(data.activePeriod, steps, effectiveSummary);
   const openExceptions = data.exceptions.filter((item) => (item.status ?? "Open") === "Open");
   const firstOpenException = openExceptions.find((item) => item.severity === "HIGH") ?? openExceptions[0];
   const firstReviewTransaction = data.transactions.find((tx) => tx.review_status === "NEEDS_REVIEW" || tx.gst_treatment === "REVIEW_REQUIRED" || tx.classification_confidence < 0.7);
@@ -128,9 +134,104 @@ export default function App() {
       !ingestionReady ||
       firstOpenException ||
       firstReviewTransaction ||
-      (data.summary && !f5Reviewed) ||
-      data.summary?.approval_ready
+      (effectiveSummary && !f5Reviewed) ||
+      effectiveSummary?.approval_ready
   );
+  const impactMetrics = useMemo(
+    () =>
+      data.activePeriod
+        ? calculateImpactMetrics({
+            period: data.activePeriod,
+            transactions: data.transactions,
+            anomalies: data.exceptions,
+            summary: effectiveSummary,
+            audit: mergedAudit,
+            f5Reviewed
+          })
+        : null,
+    [data.activePeriod, data.transactions, data.exceptions, effectiveSummary, mergedAudit, f5Reviewed]
+  );
+  const complianceActions = useMemo<ComplianceAction[]>(() => {
+    const actions: ComplianceAction[] = [];
+    const openAnomalies = data.exceptions.filter((item) => (item.status ?? "Open") === "Open");
+    const reviewTransactions = data.transactions.filter(
+      (tx) => tx.review_status === "NEEDS_REVIEW" || tx.gst_treatment === "REVIEW_REQUIRED" || tx.classification_confidence < 0.7
+    );
+
+    if (workflowApproved) {
+      actions.push({
+        id: "export-approved-pack",
+        label: "Download approved filing pack",
+        description: "Approved workflow is ready for export and manual submission via IRAS myTax Portal.",
+        tone: "neutral",
+        onSelect: () => guideTo(7, { action: "export" })
+      });
+      return actions;
+    }
+
+    if (!data.transactions.length) {
+      actions.push({
+        id: "upload-transaction-data",
+        label: "Upload transaction data",
+        description: "Transaction data is required before GST classification, reconciliation, and F5 computation can continue.",
+        tone: "review",
+        onSelect: () => guideTo(1, { action: "upload-source" })
+      });
+      return actions;
+    }
+
+    if (!ingestionReady) {
+      actions.push({
+        id: "confirm-ingestion-readiness",
+        label: "Confirm ingestion readiness",
+        description: "Confirm reporting quarter, GST registration status, and source readiness before standardization.",
+        tone: "review",
+        onSelect: () => guideTo(1, { action: "confirm-readiness" })
+      });
+    }
+
+    openAnomalies.slice(0, 5).forEach((item) => {
+      actions.push({
+        id: `resolve-anomaly-${item.id}`,
+        label: `${item.severity === "HIGH" ? "Resolve blocker" : "Review anomaly"}: ${item.exception_type}`,
+        description: `Transaction ${item.transaction_id}. ${item.severity === "HIGH" ? "High-severity anomalies block final approval." : "Decision or follow-up may be required."}`,
+        tone: item.severity === "HIGH" ? "critical" : "review",
+        onSelect: () => guideTo(4, { exceptionId: item.id, action: "resolve-exception" })
+      });
+    });
+
+    reviewTransactions.slice(0, 5).forEach((tx) => {
+      actions.push({
+        id: `review-transaction-${tx.id}`,
+        label: `Review transaction ${tx.id}`,
+        description: tx.description || "Low-confidence or review-required GST treatment needs accountant decision.",
+        tone: "review",
+        onSelect: () => guideTo(3, { transactionId: tx.id, action: "review-transaction" })
+      });
+    });
+
+    if (effectiveSummary && !f5Reviewed) {
+      actions.push({
+        id: "review-f5-summary",
+        label: "Review GST F5 box summary",
+        description: "Accountant review is required before final approval can be requested.",
+        tone: "review",
+        onSelect: () => guideTo(6, { action: "review-f5" })
+      });
+    }
+
+    if (effectiveSummary?.approval_ready && f5Reviewed) {
+      actions.push({
+        id: "manager-final-approval",
+        label: "Complete final approval",
+        description: "Confirm the filing pack is ready for manual submission via IRAS myTax Portal.",
+        tone: "review",
+        onSelect: () => guideTo(6, { action: "final-approval" })
+      });
+    }
+
+    return actions;
+  }, [data.transactions, data.exceptions, workflowApproved, ingestionReady, effectiveSummary, f5Reviewed]);
 
   function requiredActionLabel() {
     if (workflowApproved) return "Open export center";
@@ -139,8 +240,8 @@ export default function App() {
     if (!ingestionReady) return "Confirm ingestion readiness";
     if (firstOpenException) return "Resolve blocking issue";
     if (firstReviewTransaction) return "Review transaction";
-    if (data.summary && !f5Reviewed) return "Review F5 boxes";
-    if (data.summary?.approval_ready) return "Open final approval";
+    if (effectiveSummary && !f5Reviewed) return "Review F5 boxes";
+    if (effectiveSummary?.approval_ready) return "Open final approval";
     return "Go to required action";
   }
 
@@ -171,15 +272,15 @@ export default function App() {
       guideTo(3, { transactionId: firstReviewTransaction.id, action: "review-transaction" });
       return;
     }
-    if (data.summary && !f5Reviewed) {
+    if (effectiveSummary && !f5Reviewed) {
       guideTo(6, { action: "review-f5" });
       return;
     }
-    if (data.summary?.approval_ready) {
+    if (effectiveSummary?.approval_ready) {
       guideTo(6, { action: "final-approval" });
       return;
     }
-    guideTo(data.summary ? 5 : 1);
+    guideTo(effectiveSummary ? 5 : 1);
   }
 
   function handleStepAction(stepId: number) {
@@ -200,10 +301,10 @@ export default function App() {
       guideTo(3, { transactionId: firstReviewTransaction.id, action: "review-transaction" });
       return;
     }
-    if (stepId === 5 && data.summary && !f5Reviewed) return guideTo(6, { action: "review-f5" });
+    if (stepId === 5 && effectiveSummary && !f5Reviewed) return guideTo(6, { action: "review-f5" });
     if (stepId === 6) {
-      if (data.summary && !f5Reviewed) return guideTo(6, { action: "review-f5" });
-      if (data.summary?.approval_ready) return guideTo(6, { action: "final-approval" });
+      if (effectiveSummary && !f5Reviewed) return guideTo(6, { action: "review-f5" });
+      if (effectiveSummary?.approval_ready) return guideTo(6, { action: "final-approval" });
     }
     if (stepId === 7) return guideTo(7, { action: "export" });
     guideTo(stepId);
@@ -236,15 +337,15 @@ export default function App() {
       return;
     }
     if (stageId === 10) {
-      guideTo(data.summary ? 5 : 3);
+      guideTo(effectiveSummary ? 5 : 3);
       return;
     }
     if (stageId === 11) {
-      guideTo(data.summary ? 6 : 5, { action: data.summary && !f5Reviewed ? "review-f5" : undefined });
+      guideTo(effectiveSummary ? 6 : 5, { action: effectiveSummary && !f5Reviewed ? "review-f5" : undefined });
       return;
     }
     if (stageId === 12 || stageId === 13) {
-      guideTo(6, { action: data.summary?.approval_ready && f5Reviewed ? "final-approval" : "review-f5" });
+      guideTo(6, { action: effectiveSummary?.approval_ready && f5Reviewed ? "final-approval" : "review-f5" });
       return;
     }
     if (stageId === 14) {
@@ -262,8 +363,8 @@ export default function App() {
     if (step.id === 1 && !ingestionReady) return "Confirm";
     if ((step.id === 2 || step.id === 4 || step.id === 6) && firstOpenException) return "Resolve";
     if (step.id === 3 && firstReviewTransaction) return "Review";
-    if ((step.id === 5 || step.id === 6) && data.summary && !f5Reviewed) return "Review F5";
-    if (step.id === 6 && data.summary?.approval_ready && f5Reviewed) return "Approve";
+    if ((step.id === 5 || step.id === 6) && effectiveSummary && !f5Reviewed) return "Review F5";
+    if (step.id === 6 && effectiveSummary?.approval_ready && f5Reviewed) return "Approve";
     if (step.id === 7) return "View";
     return "Open";
   }
@@ -357,6 +458,11 @@ export default function App() {
     }
   }
 
+  function handleReviewF5() {
+    setF5Reviewed(true);
+    appendLocalAudit("GST_F5_REVIEWED_LOCALLY", "GST F5 boxes", "reviewed", "Human accountant marked the GST F5 box summary as reviewed.");
+  }
+
   function renderStep() {
     switch (currentStep.id) {
       case 1:
@@ -408,20 +514,20 @@ export default function App() {
           />
         );
       case 5:
-        return <F5SummaryPanel summary={data.summary} />;
+        return <F5SummaryPanel summary={effectiveSummary} />;
       case 6:
         return (
           <div className="grid gap-5">
             <ApprovalPanel
               period={data.activePeriod}
-              summary={data.summary}
+              summary={effectiveSummary}
               f5Reviewed={f5Reviewed}
               focusAction={guidedAction === "review-f5" || guidedAction === "final-approval" ? guidedAction : null}
               onFocusHandled={() => setGuidedAction(null)}
-              onReviewF5={() => setF5Reviewed(true)}
+              onReviewF5={handleReviewF5}
               onApprove={handleApprove}
             />
-            <F5SummaryPanel summary={data.summary} />
+            <F5SummaryPanel summary={effectiveSummary} />
           </div>
         );
       case 7:
@@ -484,15 +590,20 @@ export default function App() {
           </section>
         ) : (
           <>
-            <StatusBanner
-              period={data.activePeriod}
-              currentStep={systemCurrentStep}
-              blockingIssues={blockingIssues}
-              readiness={filingReadiness}
-              humanReviewsRequired={humanReviewsRequired}
-              highSeverityAnomalies={highSeverityAnomalies}
-              transactionCount={data.transactions.length}
-            />
+            <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+              <StatusBanner
+                period={data.activePeriod}
+                currentStep={systemCurrentStep}
+                blockingIssues={blockingIssues}
+                readiness={filingReadiness}
+                humanReviewsRequired={humanReviewsRequired}
+                highSeverityAnomalies={highSeverityAnomalies}
+                transactionCount={data.transactions.length}
+                className="h-full"
+              />
+              <WorkflowReferencePanel open={referenceOpen} onToggle={() => setReferenceOpen((value) => !value)} />
+            </div>
+            {referenceOpen && <WorkflowReferenceDetails view={referenceView} onViewChange={setReferenceView} />}
             <ProcessFlowModal />
             <div className="grid items-start gap-5 xl:grid-cols-[280px_minmax(0,1fr)_360px]">
               <WorkflowStepper steps={steps} activeStepId={currentStep.id} onSelect={handleStepAction} getActionLabel={stepActionLabel} />
@@ -510,11 +621,12 @@ export default function App() {
                   currentStep={systemCurrentStep}
                   transactions={data.transactions}
                   anomalies={data.exceptions}
-                  summary={data.summary}
+                  summary={effectiveSummary}
                   readiness={filingReadiness}
                   activeSourceCount={activeSourceSummary.length}
                   onStageAction={handleBoardStageAction}
                 />
+                {impactMetrics && <ImpactEvaluationPanel metrics={impactMetrics} />}
                 <section ref={workspaceRef} className="panel scroll-mt-5 border-l-4 border-l-accent p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9A4F10]">Active workspace</p>
                   <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -531,14 +643,13 @@ export default function App() {
                 currentStep={currentStep}
                 transactions={data.transactions}
                 anomalies={data.exceptions}
-                summary={data.summary}
+                summary={effectiveSummary}
                 audit={mergedAudit}
                 readiness={filingReadiness}
                 activeSourceSummary={activeSourceSummary}
+                actionQueue={complianceActions}
                 onPrimaryAction={hasGuidedRequiredAction ? guideToRequiredAction : undefined}
                 primaryActionLabel={requiredActionLabel()}
-                onResolveException={(exceptionId) => guideTo(4, { exceptionId, action: "resolve-exception" })}
-                onReviewTransaction={(transactionId) => guideTo(3, { transactionId, action: "review-transaction" })}
               />
             </div>
           </>

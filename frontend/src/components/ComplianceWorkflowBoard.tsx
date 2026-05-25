@@ -129,7 +129,7 @@ function buildStages(args: {
   const openAny = args.anomalies.filter((item) => (item.status ?? "Open") === "Open").length;
   const lowConfidence = args.transactions.filter((tx) => tx.classification_confidence < 0.7 || tx.review_status === "NEEDS_REVIEW").length;
   const hasData = args.transactions.length > 0;
-  const hasSummary = Boolean(args.summary);
+  const hasSummary = Boolean(args.summary && args.summary.transaction_count > 0 && hasData);
   const approved = args.readiness === "Approved for Manual Submission";
   const blockedByAnomaly = openHigh > 0;
 
@@ -249,7 +249,7 @@ function buildStages(args: {
       title: "Filing Pack Generation",
       owner: "Filing Pack Generator",
       category: "AI Task",
-      status: approved ? "Completed" : hasSummary && !blockedByAnomaly ? "In Progress" : "Blocked",
+      status: approved ? "Completed" : !hasData ? "Not Started" : hasSummary && !blockedByAnomaly ? "In Progress" : "Blocked",
       description: "Generate GST F5 summary, transaction listing, anomaly report, evidence traceability report, and audit trail export.",
       requiredAction: "Prepared for manual submission via IRAS myTax Portal. This prototype does not submit directly to IRAS.",
       auditEvents: ["Filing pack generated", "Export files prepared for manual submission"]
@@ -259,7 +259,7 @@ function buildStages(args: {
       title: "Manager Final Approval",
       owner: "Manager / Final Approver",
       category: "Human Approval Required",
-      status: approved ? "Completed" : blockedByAnomaly ? "Blocked" : "Needs Review",
+      status: approved ? "Completed" : !hasData ? "Not Started" : blockedByAnomaly ? "Blocked" : "Needs Review",
       description: "Manager reviews filing pack, accountant confirmations, and unresolved warnings before approving or returning for revision.",
       requiredAction: "Manager final approval required before the workflow is approved for manual submission.",
       auditEvents: ["Manager approval pending", "Final approval confirmation captured"]

@@ -1,5 +1,9 @@
 import { AuditLogItem, ExceptionItem, FilingPeriod, GstF5Summary, Transaction, WorkflowStep } from "./api";
 
+export function isComputedF5Summary(summary: GstF5Summary | null): summary is GstF5Summary {
+  return Boolean(summary && summary.transaction_count > 0);
+}
+
 export function deriveWorkflow(
   period: FilingPeriod | null,
   transactions: Transaction[],
@@ -9,9 +13,10 @@ export function deriveWorkflow(
   ingestionConfirmed = false
 ): WorkflowStep[] {
   const hasData = transactions.length > 0;
+  const hasComputedSummary = hasData && isComputedF5Summary(summary);
   const lowConfidence = transactions.filter((tx) => tx.classification_confidence < 0.7 && tx.review_status !== "APPROVED").length;
   const needsReview = transactions.filter((tx) => tx.review_status === "NEEDS_REVIEW" || tx.gst_treatment === "REVIEW_REQUIRED").length;
-  const reviewRequired = summary?.needs_review_count ?? lowConfidence + needsReview;
+  const reviewRequired = hasComputedSummary ? summary.needs_review_count : lowConfidence + needsReview;
   const openHigh = anomalies.filter((item) => item.severity === "HIGH" && (item.status ?? "Open") === "Open").length;
   const openAny = anomalies.filter((item) => (item.status ?? "Open") === "Open").length;
   const approved = period?.status === "APPROVED";
@@ -53,14 +58,14 @@ export function deriveWorkflow(
     {
       id: 5,
       title: "GST F5 Computation",
-      status: approved ? "Approved" : !summary ? "Not Started" : lowConfidence || needsReview ? "Blocked" : f5Reviewed ? "Approved" : "AI Completed",
+      status: approved ? "Approved" : !hasComputedSummary ? "Not Started" : lowConfidence || needsReview ? "Blocked" : f5Reviewed ? "Approved" : "AI Completed",
       owner: f5Reviewed ? "Human Accountant" : "AI Agent",
-      summary: summary ? "Box 1 to Box 8 and Box 13 computed from reviewed transaction treatments." : "Waiting for transaction review."
+      summary: hasComputedSummary ? "Box 1 to Box 8 and Box 13 computed from reviewed transaction treatments." : "Waiting for transaction data and reviewed treatments."
     },
     {
       id: 6,
       title: "Human Review and Approval",
-      status: !summary ? "Not Started" : approved ? "Approved" : summary.approval_ready && f5Reviewed ? "Needs Human Review" : "Blocked",
+      status: !hasComputedSummary ? "Not Started" : approved ? "Approved" : summary.approval_ready && f5Reviewed ? "Needs Human Review" : "Blocked",
       owner: approved ? "Manager" : "Human Accountant",
       summary: approved ? "Approved for manual submission via IRAS myTax Portal." : "Human accountant approval is required before manual submission."
     },
@@ -80,7 +85,7 @@ export function selectCurrentStep(steps: WorkflowStep[]) {
 
 export function readiness(period: FilingPeriod | null, steps: WorkflowStep[], summary: GstF5Summary | null) {
   if (period?.status === "APPROVED") return "Approved for Manual Submission";
-  if (summary?.approval_ready) return "Ready for Approval";
+  if (isComputedF5Summary(summary) && summary.approval_ready) return "Ready for Approval";
   if (!period || steps.every((step) => step.status === "Not Started")) return "Not Ready";
   return "Review Required";
 }

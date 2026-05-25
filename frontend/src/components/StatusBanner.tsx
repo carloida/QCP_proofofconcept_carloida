@@ -7,7 +7,8 @@ export default function StatusBanner({
   readiness,
   humanReviewsRequired,
   highSeverityAnomalies,
-  transactionCount
+  transactionCount,
+  className = ""
 }: {
   period: FilingPeriod | null;
   currentStep: WorkflowStep;
@@ -16,11 +17,12 @@ export default function StatusBanner({
   humanReviewsRequired: number;
   highSeverityAnomalies: number;
   transactionCount: number;
+  className?: string;
 }) {
   const blocked = blockingIssues > 0;
   const statusLabel = !period ? "Setup required" : blocked ? "Final approval blocked" : "Accountant review required";
   return (
-    <section className={`panel border-l-4 p-5 ${blocked ? "border-l-risk" : "border-l-accent"}`}>
+    <section className={`panel border-l-4 p-5 ${blocked ? "border-l-risk" : "border-l-accent"} ${className}`}>
       <div className="flex flex-col gap-3 border-b border-line pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9A4F10]">Workflow status</p>

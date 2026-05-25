@@ -1,6 +1,14 @@
 import { AuditLogItem, ExceptionItem, GstF5Summary, Transaction, WorkflowStep } from "../api";
 import { recentAudit } from "../workflow";
 
+export type ComplianceAction = {
+  id: string;
+  label: string;
+  description: string;
+  tone: "critical" | "review" | "neutral";
+  onSelect: () => void;
+};
+
 export default function CompliancePanel({
   currentStep,
   transactions,
@@ -9,8 +17,7 @@ export default function CompliancePanel({
   audit,
   readiness,
   activeSourceSummary,
-  onResolveException,
-  onReviewTransaction,
+  actionQueue = [],
   onPrimaryAction,
   primaryActionLabel = "Go to required action"
 }: {
@@ -21,20 +28,17 @@ export default function CompliancePanel({
   audit: AuditLogItem[];
   readiness: string;
   activeSourceSummary?: string[];
-  onResolveException?: (exceptionId: number) => void;
-  onReviewTransaction?: (transactionId: number) => void;
+  actionQueue?: ComplianceAction[];
   onPrimaryAction?: () => void;
   primaryActionLabel?: string;
 }) {
   const open = anomalies.filter((item) => (item.status ?? "Open") === "Open");
-  const transactionActions = transactions
-    .filter((tx) => tx.classification_confidence < 0.7 || tx.review_status === "NEEDS_REVIEW")
-    .slice(0, 3)
-    .map((tx) => ({ id: tx.id, label: `Review transaction ${tx.id}: ${tx.description}` }));
-  const exceptionActions = open
-    .filter((item) => item.severity === "HIGH")
-    .slice(0, 3)
-    .map((item) => ({ id: item.id, label: `Resolve ${item.exception_type} on transaction ${item.transaction_id}` }));
+  const nextAction = actionQueue[0];
+  const actionTone = (tone: ComplianceAction["tone"]) => {
+    if (tone === "critical") return "border-[#D92243]/35 bg-[#D92243]/10 text-risk hover:border-[#D92243]/60";
+    if (tone === "review") return "border-[#F69D39]/35 bg-[#FFF5E5] text-[#9A4F10] hover:border-[#E58B27] hover:bg-[#FFE9C7]";
+    return "border-line bg-slate-50 text-slate-700 hover:bg-[#FFF9EE]";
+  };
 
   return (
     <aside className="panel sticky top-5 flex max-h-[calc(100vh-2.5rem)] flex-col overflow-hidden">
@@ -47,29 +51,37 @@ export default function CompliancePanel({
       </div>
       <div className="grid flex-1 content-start gap-5 overflow-y-auto p-5">
         <section>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">AI summary for current step</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{currentStep.summary}</p>
-          {onPrimaryAction && (
-            <button className="button-primary mt-3 w-full" onClick={onPrimaryAction}>
-              {primaryActionLabel}
-            </button>
-          )}
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Next required action</p>
+          <div className={`mt-2 rounded-md border p-3 ${nextAction ? actionTone(nextAction.tone) : "border-[#E0C375]/70 bg-[#FFF9EE] text-[#6F5D24]"}`}>
+            <p className="text-sm font-semibold text-ink">{nextAction?.label ?? "No immediate action required"}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              {nextAction?.description ?? "The workflow has no pending accountant decision at this step. Continue monitoring audit events and filing readiness."}
+            </p>
+            {(nextAction || onPrimaryAction) && (
+              <button className="button-primary mt-3 w-full" onClick={nextAction?.onSelect ?? onPrimaryAction}>
+                {nextAction ? "Go to this action" : primaryActionLabel}
+              </button>
+            )}
+          </div>
         </section>
         <section>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Human required actions</p>
-          <div className="mt-2 grid gap-2">
-            {exceptionActions.map((item) => (
-              <button key={`exception-${item.id}`} className="rounded-md border border-[#F69D39]/35 bg-[#FFF5E5] p-2 text-left text-sm text-[#9A4F10] transition hover:border-[#E58B27] hover:bg-[#FFE9C7]" onClick={() => onResolveException?.(item.id)}>
-                {item.label}
-              </button>
-            ))}
-            {transactionActions.map((item) => (
-              <button key={`transaction-${item.id}`} className="rounded-md border border-[#F69D39]/35 bg-[#FFF5E5] p-2 text-left text-sm text-[#9A4F10] transition hover:border-[#E58B27] hover:bg-[#FFE9C7]" onClick={() => onReviewTransaction?.(item.id)}>
-                {item.label}
-              </button>
-            ))}
-            {!exceptionActions.length && !transactionActions.length && <p className="text-sm text-slate-500">No immediate human action required for this step.</p>}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Pending actions and decisions</p>
+            <span className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-ink">{actionQueue.length}</span>
           </div>
+          <div className="mt-2 grid gap-2">
+            {actionQueue.map((item) => (
+              <button key={item.id} className={`rounded-md border p-2 text-left transition ${actionTone(item.tone)}`} onClick={item.onSelect}>
+                <span className="block text-sm font-semibold">{item.label}</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-600">{item.description}</span>
+              </button>
+            ))}
+            {!actionQueue.length && <p className="text-sm text-slate-500">No pending actions or decisions right now.</p>}
+          </div>
+        </section>
+        <section>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Current step context</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{currentStep.summary}</p>
         </section>
         {activeSourceSummary && (
           <section>
