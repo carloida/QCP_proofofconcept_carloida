@@ -187,9 +187,67 @@ export type GstF5Summary = {
   approval_ready: boolean;
 };
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export type AiStatus = {
+  ai_enabled: boolean;
+  api_key_configured: boolean;
+  model: string;
+  status: "enabled" | "not_configured" | "disabled";
+  enabled_agents: string[];
+  ai_capable_agents: string[];
+  deterministic_modules: string[];
+};
+
+export type AiUsageEvent = {
+  id: string;
+  period_id: number;
+  source_file_id?: string | null;
+  agent_name: string;
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  estimated_cost_usd?: number | null;
+  estimated_cost_sgd?: number | null;
+  latency_ms: number;
+  status: "completed" | "failed" | "fallback";
+  fallback_used: boolean;
+  created_at: string;
+};
+
+export type AiUsageSummary = {
+  period_id: number;
+  summary: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    estimated_cost_usd?: number | null;
+    estimated_cost_sgd?: number | null;
+    fallback_count: number;
+    request_count: number;
+    last_run?: AiUsageEvent | null;
+  };
+  events: AiUsageEvent[];
+};
+
+export type AiAgentRunResponse = {
+  agent: string;
+  model: string;
+  status: "completed" | "fallback";
+  ai_fallback: boolean;
+  summary: Record<string, number>;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+  usage_event?: AiUsageEvent;
+  findings?: Array<Record<string, unknown>>;
+  classifications?: Array<Record<string, unknown>>;
+};
+
+async function request<T>(path: string, init?: RequestInit, timeoutMs = 2500): Promise<T> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 2500);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   const response = await fetch(`${API_BASE}${path}`, { ...init, signal: init?.signal ?? controller.signal }).finally(() => {
     window.clearTimeout(timeout);
   });
@@ -201,6 +259,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  getAiStatus: () => request<AiStatus>("/ai/status"),
   createPeriod: (payload: { name: string; start_date: string; end_date: string }) =>
     request<FilingPeriod>("/api/filing-periods", {
       method: "POST",
@@ -220,6 +279,11 @@ export const api = {
   exceptions: (periodId: number) => request<ExceptionItem[]>(`/api/filing-periods/${periodId}/exceptions`),
   summary: (periodId: number) => request<GstF5Summary>(`/api/filing-periods/${periodId}/gst-f5-summary`),
   audit: (periodId: number) => request<AuditLogItem[]>(`/api/filing-periods/${periodId}/audit-log`),
+  getAiUsage: (periodId: number) => request<AiUsageSummary>(`/api/filing-periods/${periodId}/ai-usage`),
+  runAiIngestionQualityReview: (periodId: number) =>
+    request<AiAgentRunResponse>(`/api/filing-periods/${periodId}/ai/ingestion-quality-review`, { method: "POST" }, 60000),
+  runAiGstClassification: (periodId: number) =>
+    request<AiAgentRunResponse>(`/api/filing-periods/${periodId}/ai/classify-gst-treatment`, { method: "POST" }, 60000),
   approve: (periodId: number) => request<{ status: string }>(`/api/filing-periods/${periodId}/approve`, { method: "POST" }),
   approveTransaction: (transactionId: number, payload: { user_name: string; comment: string }) =>
     request<{ status: string }>(`/api/transactions/${transactionId}/approve`, {

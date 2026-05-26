@@ -1,0 +1,62 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 2075 >>
+stream
+BT
+/F1 8 Tf
+36 780 Td
+(QCP GST EXPORT - messy supplier dump - NOT FINAL) Tj
+0 -18 Td
+(Generated from multiple tabs. Accountant review required. Some rows contain deliberate issues.) Tj
+0 -18 Td
+(# random note: parser should ignore comment lines without pipe table data) Tj
+0 -18 Td
+(transaction_date|invoice_no|source_system|transaction_type|counterparty_name|counterparty_country|gl_account|description|currency|net_amount|gst_amount|gross_amount|original_tax_code) Tj
+0 -18 Td
+(2026-01-07|INV-MESS-001|Spreadsheet A|SALE|Kallang Design Studio|SG|4000 Sales|Local service with GST but values from copied PDF|SGD|12000|1080|13080|SR) Tj
+0 -18 Td
+(2025-12-31|INV-OLD-778|Spreadsheet A|SALE|Prior Year Customer|SG|4000 Sales|Out of period local service accidentally included|SGD|9000|810|9810|SR) Tj
+0 -18 Td
+(2026-02-03||Email Extract|PURCHASE|Office Supplies Pte Ltd|SG|5100 Office Supplies|Missing invoice number for input tax claim|SGD|1800|162|1962|TX) Tj
+0 -18 Td
+(2026-02-03|DUP-445|Email Extract|PURCHASE|Office Supplies Pte Ltd|SG|5100 Office Supplies|Duplicate invoice first copy|SGD|1800|162|1962|TX) Tj
+0 -18 Td
+(2026-02-04|DUP-445|Email Extract|PURCHASE|Office Supplies Pte Ltd|SG|5100 Office Supplies|Duplicate invoice second copy pasted from another tab|SGD|1800|162|1962|TX) Tj
+0 -18 Td
+(2026-02-18|FX-901|Bank Export|PURCHASE|Tokyo Cloud Services|JP|6100 Software|Overseas service no SGD conversion support shown|JPY|450000|0|450000|RC) Tj
+0 -18 Td
+(2026-03-09|CR-118|Manual Journal|ADJUSTMENT|Harbour Analytics Pte Ltd|SG|4900 Credit Notes|Credit note negative GST amount requires review|SGD|-2400|-216|-2616|SR) Tj
+0 -18 Td
+(2026-03-15|MISMATCH-77|Spreadsheet B|SALE|Bukit Retail Pte Ltd|SG|4000 Sales|Gross does not equal net plus GST because row was manually edited|SGD|5000|450|6000|SR) Tj
+0 -18 Td
+(2026-03-22|ZR-NO-EVID|Spreadsheet B|SALE|Sydney Customer|AU|4010 Export Sales|Zero rated export sale but evidence packet missing|SGD|16000|0|16000|ZR) Tj
+0 -18 Td
+(footer: exchange rates pending; some blank invoice fields are expected in raw source) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2438
+%%EOF

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AiUsageSummary } from "../api";
 import { ImpactMetrics, formatMinutesAsHours, formatPercent, formatSgd, getMetricStatusColor } from "../metrics";
 
 function toneClass(tone: ReturnType<typeof getMetricStatusColor>) {
@@ -54,7 +55,7 @@ function MetricCard({
   );
 }
 
-export default function ImpactEvaluationPanel({ metrics }: { metrics: ImpactMetrics }) {
+export default function ImpactEvaluationPanel({ metrics, aiUsage }: { metrics: ImpactMetrics; aiUsage?: AiUsageSummary | null }) {
   const [open, setOpen] = useState(false);
   const hasTransactions = metrics.totalTransactions > 0;
   const blockerTone = getMetricStatusColor("blockers", metrics.complianceBlockerCount === null ? null : 1, metrics.complianceBlockerCount ?? 0);
@@ -152,6 +153,43 @@ export default function ImpactEvaluationPanel({ metrics }: { metrics: ImpactMetr
                   status="Per filing cycle"
                   tone="neutral"
                   helper="Based on estimated time saved and configurable hourly cost assumption."
+                />
+              </div>
+
+              <div className="mt-3 grid gap-3 lg:grid-cols-4">
+                <MetricCard
+                  label="AI Token Usage"
+                  value={(aiUsage?.summary.total_tokens ?? 0).toLocaleString()}
+                  status={`${aiUsage?.summary.request_count ?? 0} requests`}
+                  tone="neutral"
+                  helper="Total prompt and completion tokens recorded for real AI-enabled agent requests in this period."
+                />
+                <MetricCard
+                  label="Estimated AI Cost"
+                  value={
+                    aiUsage?.summary.estimated_cost_sgd !== null && aiUsage?.summary.estimated_cost_sgd !== undefined
+                      ? `SGD ${aiUsage.summary.estimated_cost_sgd.toFixed(4)}`
+                      : aiUsage?.summary.estimated_cost_usd !== null && aiUsage?.summary.estimated_cost_usd !== undefined
+                        ? `USD ${aiUsage.summary.estimated_cost_usd.toFixed(4)}`
+                        : "Cost estimate unavailable"
+                  }
+                  status="Configurable pricing"
+                  tone="neutral"
+                  helper="Shown only when pricing environment variables are configured; otherwise token counts remain visible."
+                />
+                <MetricCard
+                  label="Last AI Run"
+                  value={aiUsage?.summary.last_run ? aiUsage.summary.last_run.agent_name.replaceAll("_", " ") : "No run yet"}
+                  status={aiUsage?.summary.last_run?.status ?? "Pending"}
+                  tone={aiUsage?.summary.last_run?.fallback_used ? "warning" : "neutral"}
+                  helper={aiUsage?.summary.last_run ? `${aiUsage.summary.last_run.latency_ms} ms latency` : "Run one of the two AI-enabled agents to populate runtime telemetry."}
+                />
+                <MetricCard
+                  label="Fallback Count"
+                  value={`${aiUsage?.summary.fallback_count ?? 0}`}
+                  status={(aiUsage?.summary.fallback_count ?? 0) > 0 ? "Fallback used" : "Clear"}
+                  tone={(aiUsage?.summary.fallback_count ?? 0) > 0 ? "warning" : "good"}
+                  helper="Fallback keeps the workflow running when AI is not configured, fails, or returns invalid output."
                 />
               </div>
 

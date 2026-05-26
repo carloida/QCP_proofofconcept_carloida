@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, AuditLogItem, ExceptionItem, FilingPeriod, GstF5Summary, Transaction } from "./api";
+import { api, AiStatus, AiUsageSummary, AuditLogItem, ExceptionItem, FilingPeriod, GstF5Summary, Transaction } from "./api";
 import AnomalyQueue from "./components/AnomalyQueue";
 import ApprovalPanel from "./components/ApprovalPanel";
 import AuditTrail from "./components/AuditTrail";
+import AiAgentRuntimeCard from "./components/AiAgentRuntimeCard";
 import CompliancePanel, { ComplianceAction } from "./components/CompliancePanel";
 import ComplianceWorkflowBoard from "./components/ComplianceWorkflowBoard";
 import DataIngestionHub from "./components/DataIngestionHub";
@@ -61,6 +62,10 @@ export default function App() {
   const [guidedAction, setGuidedAction] = useState<GuidedAction | null>("create-period");
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [referenceView, setReferenceView] = useState<"Schema" | "Owners">("Schema");
+  const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
+  const [aiUsage, setAiUsage] = useState<AiUsageSummary | null>(null);
+  const [aiRunLoading, setAiRunLoading] = useState<string | null>(null);
+  const [aiRunError, setAiRunError] = useState("");
   const workspaceRef = useRef<HTMLElement | null>(null);
 
   const refresh = useCallback(async (periodId?: number) => {
@@ -111,6 +116,22 @@ export default function App() {
   useEffect(() => {
     refresh();
   }, []);
+
+  useEffect(() => {
+    api.getAiStatus()
+      .then(setAiStatus)
+      .catch(() => setAiStatus(null));
+  }, []);
+
+  useEffect(() => {
+    if (!data.activePeriod) {
+      setAiUsage(null);
+      return;
+    }
+    api.getAiUsage(data.activePeriod.id)
+      .then(setAiUsage)
+      .catch(() => setAiUsage(null));
+  }, [data.activePeriod?.id, data.audit.length]);
 
   const mergedAudit = useMemo(() => [...data.audit, ...localAudit].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()), [data.audit, localAudit]);
   const ingestionReady = ingestionConfirmations.reportingQuarter && ingestionConfirmations.gstRegistered && ingestionConfirmations.sourceReady;
@@ -411,7 +432,7 @@ export default function App() {
     setLoading(true);
     try {
       const result = await api.upload(data.activePeriod.id, file);
-      setMessage(`AI has completed initial classification. Human review is required for ${result.review_required} transactions.`);
+      setMessage(`Transaction file uploaded and deterministic baseline classification completed. Human review is required for ${result.review_required} transactions. Run AI GST classification when AI is configured.`);
       setActiveStepId(3);
       setF5Reviewed(false);
       await refresh(data.activePeriod.id);
@@ -419,6 +440,57 @@ export default function App() {
       setMessage(error instanceof Error ? error.message : "Upload failed.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function refreshAiUsage(periodId = data.activePeriod?.id) {
+    if (!periodId) return;
+    try {
+      setAiUsage(await api.getAiUsage(periodId));
+    } catch {
+      setAiUsage(null);
+    }
+  }
+
+  async function handleRunAiIngestionQualityReview() {
+    if (!data.activePeriod) return;
+    setAiRunLoading("ingestion");
+    setAiRunError("");
+    try {
+      const result = await api.runAiIngestionQualityReview(data.activePeriod.id);
+      setMessage(
+        result.ai_fallback
+          ? "AI request was not available. Deterministic fallback reviewed ingestion quality so the workflow can continue."
+          : `Ingestion & Data Quality Agent reviewed ${result.summary.records_reviewed ?? data.transactions.length} records.`
+      );
+      await refresh(data.activePeriod.id);
+      await refreshAiUsage(data.activePeriod.id);
+    } catch (error) {
+      setAiRunError(error instanceof Error ? error.message : "AI ingestion quality review failed.");
+    } finally {
+      setAiRunLoading(null);
+    }
+  }
+
+  async function handleRunAiGstClassification() {
+    if (!data.activePeriod) return;
+    setAiRunLoading("classification");
+    setAiRunError("");
+    try {
+      const result = await api.runAiGstClassification(data.activePeriod.id);
+      setMessage(
+        result.ai_fallback
+          ? "AI request failed or is not configured. Deterministic fallback classification was used so the workflow can continue."
+          : `GST Treatment Classification Agent completed ${result.summary.transactions_classified ?? data.transactions.length} recommendations; ${result.summary.review_required_count ?? 0} require human review.`
+      );
+      setActiveStepId(3);
+      setF5Reviewed(false);
+      await refresh(data.activePeriod.id);
+      await refreshAiUsage(data.activePeriod.id);
+    } catch (error) {
+      setAiRunError(error instanceof Error ? error.message : "AI GST classification failed.");
+    } finally {
+      setAiRunLoading(null);
     }
   }
 
@@ -626,7 +698,7 @@ export default function App() {
                   activeSourceCount={activeSourceSummary.length}
                   onStageAction={handleBoardStageAction}
                 />
-                {impactMetrics && <ImpactEvaluationPanel metrics={impactMetrics} />}
+                {impactMetrics && <ImpactEvaluationPanel metrics={impactMetrics} aiUsage={aiUsage} />}
                 <section ref={workspaceRef} className="panel scroll-mt-5 border-l-4 border-l-accent p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9A4F10]">Active workspace</p>
                   <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -648,6 +720,17 @@ export default function App() {
                 readiness={filingReadiness}
                 activeSourceSummary={activeSourceSummary}
                 actionQueue={complianceActions}
+                aiRuntime={
+                  <AiAgentRuntimeCard
+                    status={aiStatus}
+                    usage={aiUsage}
+                    disabled={!data.activePeriod || !data.transactions.length}
+                    loadingAgent={aiRunLoading}
+                    error={aiRunError}
+                    onRunIngestionQuality={handleRunAiIngestionQualityReview}
+                    onRunClassification={handleRunAiGstClassification}
+                  />
+                }
                 onPrimaryAction={hasGuidedRequiredAction ? guideToRequiredAction : undefined}
                 primaryActionLabel={requiredActionLabel()}
               />

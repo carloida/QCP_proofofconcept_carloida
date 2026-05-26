@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { AuditLogItem, ExceptionItem, GstF5Summary, Transaction, WorkflowStep } from "../api";
 import { recentAudit } from "../workflow";
 
@@ -18,6 +19,7 @@ export default function CompliancePanel({
   readiness,
   activeSourceSummary,
   actionQueue = [],
+  aiRuntime,
   onPrimaryAction,
   primaryActionLabel = "Go to required action"
 }: {
@@ -29,6 +31,7 @@ export default function CompliancePanel({
   readiness: string;
   activeSourceSummary?: string[];
   actionQueue?: ComplianceAction[];
+  aiRuntime?: ReactNode;
   onPrimaryAction?: () => void;
   primaryActionLabel?: string;
 }) {
@@ -83,6 +86,7 @@ export default function CompliancePanel({
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Current step context</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{currentStep.summary}</p>
         </section>
+        {aiRuntime}
         {activeSourceSummary && (
           <section>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Active ingestion sources</p>

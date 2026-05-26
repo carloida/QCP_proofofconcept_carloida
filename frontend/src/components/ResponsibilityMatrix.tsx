@@ -1,18 +1,25 @@
 const columns = [
   {
-    title: "AI handles",
-    badge: "AI Task",
+    title: "Real AI enabled",
+    badge: "Real AI Enabled",
     badgeClass: "badge-ai",
     surfaceClass: "surface-ai",
     items: [
-      "Parse uploaded financial data",
-      "Standardize transaction fields",
-      "Propose GST treatment classification",
-      "Compute confidence score",
-      "Detect anomalies",
-      "Compute GST F5 boxes",
-      "Generate filing pack draft",
-      "Prepare export files"
+      "Ingestion & Data Quality Agent reviews parsed records",
+      "GST Treatment Classification Agent recommends GST treatment",
+      "Confidence, reason, review flag, and token usage are recorded"
+    ]
+  },
+  {
+    title: "Deterministic controls",
+    badge: "Deterministic Control",
+    badgeClass: "badge-system",
+    surfaceClass: "surface-audit",
+    items: [
+      "Evidence matching rules remain controlled",
+      "Reconciliation and anomaly checks are deterministic",
+      "GST F5 computation uses deterministic formulas",
+      "Workflow routing and export remain deterministic"
     ]
   },
   {
@@ -38,11 +45,11 @@ const columns = [
     items: ["Final sign-off before manual filing"]
   },
   {
-    title: "System handles",
-    badge: "System Audit",
+    title: "Placeholder modules",
+    badge: "Placeholder",
     badgeClass: "badge-audit",
-    surfaceClass: "surface-audit",
-    items: ["Audit logging", "Version tracking", "Export records"]
+    surfaceClass: "surface-human",
+    items: ["Enterprise evidence OCR", "Accounting API connectors", "Future filing-pack enrichments"]
   }
 ];
 
@@ -52,7 +59,9 @@ export default function ResponsibilityMatrix() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-ink">Responsibility Matrix</h2>
-          <p className="mt-1 text-sm text-slate-600">Clear separation between agent automation, human judgement, manager approval, and system records.</p>
+          <p className="mt-1 text-sm text-slate-600">
+            This prototype currently uses real AI for ingestion quality review and GST treatment classification. Other workflow modules are deterministic controls or placeholders to preserve compliance predictability.
+          </p>
         </div>
         <span className="badge-blocked">Human Approval Required</span>
       </div>

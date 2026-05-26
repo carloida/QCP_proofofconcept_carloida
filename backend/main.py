@@ -9,6 +9,9 @@ from database import get_connection, init_db, row_to_dict
 from models import Actor
 from schemas import ApprovalRequest, ExceptionStatusRequest, FilingPeriod, FilingPeriodCreate, OverrideRequest
 from services.audit_service import write_audit
+from services.ai_agents import run_gst_classification, run_ingestion_quality_review
+from services.ai_client import ai_status
+from services.ai_usage import get_period_ai_usage
 from services.export_service import audit_csv, exceptions_csv, gst_f5_json, transactions_csv
 from services.gst_f5_service import compute_summary
 from services.ingestion_service import SUPPORTED_EXTENSIONS, ingest_transactions
@@ -33,6 +36,11 @@ def startup() -> None:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "service": "GST F5 Compliance Agent Prototype"}
+
+
+@app.get("/ai/status")
+def get_ai_status() -> dict:
+    return ai_status()
 
 
 @app.post("/api/filing-periods", response_model=FilingPeriod)
@@ -111,6 +119,35 @@ def list_transactions(filing_period_id: int):
             (filing_period_id,),
         ).fetchall()
         return [dict(row) for row in rows]
+
+
+@app.get("/api/filing-periods/{filing_period_id}/ai-usage")
+def filing_period_ai_usage(filing_period_id: int):
+    with get_connection() as conn:
+        _get_period(conn, filing_period_id)
+        return get_period_ai_usage(conn, filing_period_id)
+
+
+@app.post("/api/filing-periods/{filing_period_id}/ai/ingestion-quality-review")
+def ai_ingestion_quality_review(filing_period_id: int):
+    with get_connection() as conn:
+        period = _get_period(conn, filing_period_id)
+        transactions = conn.execute("SELECT COUNT(*) AS count FROM transactions WHERE filing_period_id = ?", (filing_period_id,)).fetchone()
+        if not transactions or transactions["count"] == 0:
+            raise HTTPException(status_code=400, detail="Upload transaction records before running AI ingestion quality review")
+        return run_ingestion_quality_review(conn, period)
+
+
+@app.post("/api/filing-periods/{filing_period_id}/ai/classify-gst-treatment")
+def ai_classify_gst_treatment(filing_period_id: int):
+    with get_connection() as conn:
+        period = _get_period(conn, filing_period_id)
+        transactions = conn.execute("SELECT COUNT(*) AS count FROM transactions WHERE filing_period_id = ?", (filing_period_id,)).fetchone()
+        if not transactions or transactions["count"] == 0:
+            raise HTTPException(status_code=400, detail="Upload transaction records before running AI GST treatment classification")
+        result = run_gst_classification(conn, period)
+        write_audit(conn, filing_period_id, Actor.SYSTEM, "GST_F5_RECALCULATED", "Summary recalculated after AI-assisted GST classification.", affected_item="GST F5 boxes", step="Step 5: GST F5 Computation")
+        return result
 
 
 @app.patch("/api/transactions/{transaction_id}/override")

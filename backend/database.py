@@ -86,6 +86,24 @@ def init_db() -> None:
                 FOREIGN KEY (filing_period_id) REFERENCES filing_periods(id) ON DELETE CASCADE,
                 FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
             );
+
+            CREATE TABLE IF NOT EXISTS ai_usage_events (
+                id TEXT PRIMARY KEY,
+                period_id INTEGER NOT NULL,
+                source_file_id TEXT,
+                agent_name TEXT NOT NULL,
+                model TEXT NOT NULL,
+                prompt_tokens INTEGER NOT NULL DEFAULT 0,
+                completion_tokens INTEGER NOT NULL DEFAULT 0,
+                total_tokens INTEGER NOT NULL DEFAULT 0,
+                estimated_cost_usd REAL,
+                estimated_cost_sgd REAL,
+                latency_ms INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL,
+                fallback_used INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (period_id) REFERENCES filing_periods(id) ON DELETE CASCADE
+            );
             """
         )
         _ensure_column(conn, "reconciliation_exceptions", "status", "TEXT NOT NULL DEFAULT 'Open'")

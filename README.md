@@ -13,7 +13,8 @@ Important: this prototype prepares filing-ready outputs for manual submission vi
 - Keeps database and accounting API connector surfaces empty until real integrations are configured.
 - Separates transaction data sources from supporting evidence uploads.
 - Standardizes transactions into a canonical GST schema.
-- Uses AI-style classification outputs to recommend GST treatment, confidence, evidence status, and review priority.
+- Uses real AI only for two controlled assistance points when configured: ingestion data quality review and GST treatment classification.
+- Keeps evidence matching, reconciliation, GST F5 computation, workflow orchestration, audit, and export as deterministic controls or placeholders.
 - Detects reconciliation and anomaly issues such as missing export evidence, missing tax invoices, duplicate invoices, FX gaps, and high-severity blockers.
 - Routes low-confidence or risky classifications to human accountant review.
 - Supports human review, override reason capture, and anomaly resolution statuses.
@@ -52,6 +53,7 @@ Backend:
 - SQLite
 - Pandas
 - Pydantic
+- OpenAI Python SDK for the two optional AI-assisted agents
 
 ## Project Structure
 
@@ -106,6 +108,78 @@ Backend health check:
 ```text
 http://127.0.0.1:8000/health
 ```
+
+## Optional AI API Setup
+
+The app runs without an API key. If no key is configured, the two AI-assisted agents use deterministic fallback logic and the UI shows fallback mode.
+
+For local AI testing:
+
+1. Copy `backend/.env.example` to `backend/.env`.
+2. Add your backend-only API key:
+
+```text
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-4.1-mini
+AI_ENABLED=true
+```
+
+Optional cost estimate settings:
+
+```text
+OPENAI_INPUT_COST_PER_1M_TOKENS_USD=
+OPENAI_OUTPUT_COST_PER_1M_TOKENS_USD=
+USD_TO_SGD_RATE=
+```
+
+Never commit a real API key. The frontend never receives or stores the key.
+
+AI status endpoint:
+
+```text
+GET http://127.0.0.1:8000/ai/status
+```
+
+Period AI usage endpoint:
+
+```text
+GET http://127.0.0.1:8000/api/filing-periods/{period_id}/ai-usage
+```
+
+AI-assisted agent endpoints:
+
+```text
+POST http://127.0.0.1:8000/api/filing-periods/{period_id}/ai/ingestion-quality-review
+POST http://127.0.0.1:8000/api/filing-periods/{period_id}/ai/classify-gst-treatment
+```
+
+Suggested test flow:
+
+1. Start backend and frontend.
+2. Create a reporting quarter.
+3. Upload `test_files/qcp_clean_gst_transactions.xlsx` or `test_files/qcp_clean_gst_transactions.pdf`.
+4. Open the AI Agent Runtime card in the Compliance Panel.
+5. Run Ingestion & Data Quality review.
+6. Run AI GST classification.
+7. Review token usage, fallback status, audit events, and any human review queue items.
+
+## Agent Architecture
+
+Real AI enabled:
+
+- Ingestion & Data Quality Agent
+- GST Treatment Classification Agent
+
+Deterministic controls or placeholders:
+
+- Evidence Matching Agent
+- Reconciliation & Anomaly Detection Agent
+- GST F5 Computation Agent
+- Compliance Workflow Orchestrator Agent
+- Audit Trail & Explainability Module
+- Filing Pack / Export Module
+
+This is intentional. The architecture is a controlled hybrid finance compliance workflow: AI assists where interpretation and classification add value, while deterministic rules and human approval protect compliance control.
 
 ## Compliance Positioning
 

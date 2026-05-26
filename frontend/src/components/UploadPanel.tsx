@@ -21,6 +21,7 @@ export default function UploadPanel({
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const createRef = useRef<HTMLFormElement | null>(null);
   const uploadRef = useRef<HTMLDivElement | null>(null);
 
@@ -35,6 +36,12 @@ export default function UploadPanel({
   function submitPeriod(event: FormEvent) {
     event.preventDefault();
     onCreatePeriod({ name, start_date: startDate, end_date: endDate });
+  }
+
+  function confirmUpload() {
+    if (!pendingFile) return;
+    onUpload(pendingFile);
+    setPendingFile(null);
   }
 
   return (
@@ -84,10 +91,31 @@ export default function UploadPanel({
             disabled={!activePeriod}
             onChange={(event) => {
               const file = event.target.files?.[0];
-              if (file) onUpload(file);
+              if (file) {
+                setPendingFile(file);
+                event.target.value = "";
+              }
             }}
           />
-          <p className="mt-2 text-xs text-slate-500">Upload CSV, Excel, or a structured PDF transaction export.</p>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            Upload parses CSV, Excel, or structured PDF files with deterministic rules. AI token use starts only when you run an AI Agent Runtime action.
+          </p>
+          {pendingFile && (
+            <div className="mt-3 rounded-md border border-[#F69D39]/45 bg-[#FFF9EE] p-3">
+              <p className="text-sm font-semibold text-ink">Upload does not use AI tokens</p>
+              <p className="mt-1 text-xs leading-5 text-slate-600">
+                This will upload and parse <span className="font-semibold text-ink">{pendingFile.name}</span> using deterministic ingestion. AI quality review and AI GST classification are separate actions, and each will ask for confirmation before tokens are used.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button className="button-primary flex-1 text-xs" type="button" onClick={confirmUpload}>
+                  Upload file
+                </button>
+                <button className="button-secondary flex-1 text-xs" type="button" onClick={() => setPendingFile(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>
