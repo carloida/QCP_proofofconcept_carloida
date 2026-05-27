@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AuditLogItem, ExceptionItem, toUiTreatment, Transaction } from "../api";
 import TransactionDrawer from "./TransactionDrawer";
+import WorkspaceCard from "./WorkspaceCard";
 
 const money = new Intl.NumberFormat("en-SG", { style: "currency", currency: "SGD" });
 
@@ -37,16 +38,14 @@ export default function TransactionTable({
   }, [focusTransactionId, onFocusHandled, transactions]);
 
   return (
-    <section className="panel overflow-hidden">
-      <div className="border-b border-line p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <span className="badge-ai">AI Task</span>
-            <h2 className="mt-3 text-lg font-semibold text-ink">GST Treatment Classification</h2>
-            <p className="mt-1 text-sm text-slate-600">AI proposes treatment; human accountant approves, overrides, or sends items for follow-up.</p>
-          </div>
-        </div>
-      </div>
+    <WorkspaceCard
+      badge="AI Task"
+      badgeClass="badge-ai"
+      title="GST Treatment Classification"
+      description="AI proposes treatment; human accountant approves, overrides, or sends items for follow-up."
+      status={<span className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-ink">{transactions.length} transactions</span>}
+      bodyClassName="p-0"
+    >
       <div className="max-h-[640px] overflow-auto">
         <table className="min-w-[1320px] w-full text-left text-sm">
           <thead className="sticky top-0 bg-slate-50 text-xs uppercase tracking-[0.08em] text-slate-500">
@@ -93,6 +92,6 @@ export default function TransactionTable({
           onRefresh={onRefresh}
         />
       )}
-    </section>
+    </WorkspaceCard>
   );
 }

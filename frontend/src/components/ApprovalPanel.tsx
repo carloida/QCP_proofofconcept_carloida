@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { FilingPeriod, GstF5Summary } from "../api";
+import WorkspaceCard from "./WorkspaceCard";
 
 const confirmation =
   "I confirm that the GST F5 values have been reviewed by a human accountant and are ready for manual submission via IRAS myTax Portal. This prototype does not submit directly to IRAS.";
@@ -45,19 +46,16 @@ export default function ApprovalPanel({
   }
 
   return (
-    <section
+    <WorkspaceCard
       ref={panelRef}
-      className={`panel p-5 transition ${
-        focusAction ? "ring-2 ring-[#F69D39]/60 ring-offset-2 ring-offset-warm" : ""
-      }`}
-    >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <span className="badge-blocked">Human Approval Required</span>
-          <h2 className="mt-3 text-lg font-semibold text-ink">Human Review and Final Approval</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">Human accountant approval is required before manual submission. This prototype does not submit to IRAS.</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
+      badge="Human Approval Required"
+      badgeClass="badge-blocked"
+      title="Human Review and Final Approval"
+      description="Human accountant approval is required before manual submission. This prototype does not submit to IRAS."
+      focused={Boolean(focusAction)}
+      status={<span className={`rounded-md border px-3 py-2 text-sm font-semibold ${blocked ? "border-[#D92243]/30 bg-[#D92243]/10 text-risk" : "border-[#E0C375]/70 bg-[#FFF9EE] text-[#6F5D24]"}`}>{blocked ? "Approval blocked" : "Ready for approval"}</span>}
+      actions={
+        <>
           <button
             className={`button-secondary ${focusAction === "review-f5" ? "ring-2 ring-[#F69D39]/60 ring-offset-2" : ""}`}
             disabled={!summary || f5Reviewed}
@@ -72,10 +70,11 @@ export default function ApprovalPanel({
           >
             Final approval
           </button>
-        </div>
-      </div>
+        </>
+      }
+    >
       {blocked && period?.status !== "APPROVED" && (
-        <p className="mt-3 rounded-md border border-[#D92243]/30 bg-[#D92243]/10 p-3 text-sm text-risk">
+        <p className="rounded-md border border-[#D92243]/30 bg-[#D92243]/10 p-3 text-sm text-risk">
           Cannot approve until GST F5 boxes are reviewed, high-severity anomalies are cleared, and required transaction reviews are completed.
         </p>
       )}
@@ -95,6 +94,6 @@ export default function ApprovalPanel({
           </form>
         </div>
       )}
-    </section>
+    </WorkspaceCard>
   );
 }

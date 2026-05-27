@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { api } from "../api";
+import WorkspaceCard from "./WorkspaceCard";
 
 export default function ExportCenter({
   periodId,
@@ -26,18 +27,22 @@ export default function ExportCenter({
   }, [focused, onFocusHandled]);
 
   return (
-    <section
+    <WorkspaceCard
       ref={panelRef}
-      className={`panel p-5 transition ${focused ? "ring-2 ring-[#F69D39]/60 ring-offset-2 ring-offset-warm" : ""}`}
+      badge="System Audit"
+      badgeClass="badge-audit"
+      title="Export Center"
+      description="Download the filing-ready materials for manual submission via IRAS myTax Portal."
+      status={<span className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-ink">Manual submission pack</span>}
+      focused={focused}
     >
-      <h2 className="text-lg font-semibold text-ink">Export Center</h2>
-      <div className="mt-4 grid gap-2">
+      <div className="grid gap-2 md:grid-cols-2">
         {exports.map(([label, file]) => (
           <a key={file} className="button-secondary text-center" href={api.exportUrl(periodId, file)}>
             {label}
           </a>
         ))}
       </div>
-    </section>
+    </WorkspaceCard>
   );
 }

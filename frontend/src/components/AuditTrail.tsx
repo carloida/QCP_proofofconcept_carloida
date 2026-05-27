@@ -1,13 +1,16 @@
 import { AuditLogItem } from "../api";
+import WorkspaceCard from "./WorkspaceCard";
 
 export default function AuditTrail({ audit }: { audit: AuditLogItem[] }) {
   return (
-    <section className="panel overflow-hidden">
-      <div className="border-b border-line p-5">
-        <span className="badge-audit">System Audit</span>
-        <h2 className="mt-3 text-lg font-semibold text-ink">Audit Trail</h2>
-        <p className="mt-1 text-sm text-slate-600">Chronological evidence of ingestion, classification, human review, anomaly decisions, F5 computation, approval, and exports.</p>
-      </div>
+    <WorkspaceCard
+      badge="System Audit"
+      badgeClass="badge-audit"
+      title="Audit Trail"
+      description="Chronological evidence of ingestion, classification, human review, anomaly decisions, F5 computation, approval, and exports."
+      status={<span className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-ink">{audit.length} events</span>}
+      bodyClassName="p-0"
+    >
       <div className="max-h-[560px] overflow-auto">
         <table className="min-w-[1060px] w-full text-left text-sm">
           <thead className="sticky top-0 bg-slate-50 text-xs uppercase tracking-[0.08em] text-slate-500">
@@ -34,6 +37,6 @@ export default function AuditTrail({ audit }: { audit: AuditLogItem[] }) {
         </table>
         {!audit.length && <p className="p-5 text-sm text-slate-500">No audit events yet.</p>}
       </div>
-    </section>
+    </WorkspaceCard>
   );
 }

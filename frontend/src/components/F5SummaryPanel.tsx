@@ -1,4 +1,5 @@
 import { GstF5Summary } from "../api";
+import WorkspaceCard from "./WorkspaceCard";
 
 const money = new Intl.NumberFormat("en-SG", { style: "currency", currency: "SGD" });
 
@@ -15,16 +16,13 @@ const boxMeta = [
 
 export default function F5SummaryPanel({ summary }: { summary: GstF5Summary | null }) {
   return (
-    <section className="panel p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <span className="badge-ai">Computation</span>
-          <h2 className="mt-3 text-lg font-semibold text-ink">GST F5 Computation</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            Report values in Singapore dollars. Box 4 = Box 1 + Box 2 + Box 3. Box 8 = Box 6 - Box 7. Out-of-scope supplies are excluded from GST F5 reporting.
-          </p>
-        </div>
-      </div>
+    <WorkspaceCard
+      badge="Computation"
+      badgeClass="badge-ai"
+      title="GST F5 Computation"
+      description="Report values in Singapore dollars. Box 4 = Box 1 + Box 2 + Box 3. Box 8 = Box 6 - Box 7. Out-of-scope supplies are excluded from GST F5 reporting."
+      status={<span className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-ink">{summary ? `${summary.transaction_count} transactions` : "Not computed"}</span>}
+    >
       <div className="mt-4 grid gap-3 lg:grid-cols-4">
         {summary ? (
           boxMeta.map(([field, countKey, box, label, logic]) => {
@@ -62,6 +60,6 @@ export default function F5SummaryPanel({ summary }: { summary: GstF5Summary | nu
           <p className="text-sm text-slate-500">Upload and classify transactions to compute GST F5 boxes.</p>
         )}
       </div>
-    </section>
+    </WorkspaceCard>
   );
 }

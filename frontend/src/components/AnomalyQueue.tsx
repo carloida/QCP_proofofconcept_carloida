@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, ExceptionItem } from "../api";
+import WorkspaceCard from "./WorkspaceCard";
 
 const statuses = ["Open", "Resolved", "Accepted Risk", "Needs Follow Up", "Excluded From Filing"] as const;
 
@@ -45,16 +46,14 @@ export default function AnomalyQueue({
   }
 
   return (
-    <section className="panel p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <span className="badge-human">Human Review</span>
-          <h2 className="mt-3 text-lg font-semibold text-ink">Anomaly Queue</h2>
-          <p className="mt-1 text-sm text-slate-600">High severity anomalies block final approval. Accepted Risk and Excluded From Filing require a human comment.</p>
-        </div>
-        <span className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-ink">{anomalies.filter((item) => (item.status ?? "Open") === "Open").length} open</span>
-      </div>
-      <div className="mt-4 grid gap-3">
+    <WorkspaceCard
+      badge="Human Review"
+      badgeClass="badge-human"
+      title="Anomaly Queue"
+      description="High severity anomalies block final approval. Accepted Risk and Excluded From Filing require a human comment."
+      status={<span className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-ink">{anomalies.filter((item) => (item.status ?? "Open") === "Open").length} open</span>}
+    >
+      <div className="grid gap-3">
         {anomalies.map((item) => {
           const open = (item.status ?? "Open") === "Open";
           const tone = item.severity === "HIGH" && open ? "border-[#D92243]/35 bg-[#D92243]/10" : item.severity === "MEDIUM" && open ? "border-[#F69D39]/35 bg-[#FFF5E5]" : "border-line bg-white";
@@ -101,6 +100,6 @@ export default function AnomalyQueue({
           </form>
         </div>
       )}
-    </section>
+    </WorkspaceCard>
   );
 }

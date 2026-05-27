@@ -7,6 +7,7 @@ import {
   IngestionSource
 } from "../api";
 import UploadPanel from "./UploadPanel";
+import WorkspaceCard from "./WorkspaceCard";
 
 type Confirmations = {
   reportingQuarter: boolean;
@@ -154,15 +155,13 @@ export default function DataIngestionHub({
 
   if (!activePeriod) {
     return (
-      <section className="panel overflow-hidden">
-        <div className="border-b border-line bg-[#FFFBF5] p-6">
-          <span className="badge-human">New quarter</span>
-          <h2 className="mt-3 text-2xl font-semibold text-ink">Create a reporting quarter</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Start with the period name and dates. After it is created, the workspace will guide you to choose a source and upload the GST transaction file.
-          </p>
-        </div>
-        <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_240px]">
+      <WorkspaceCard
+        badge="New quarter"
+        badgeClass="badge-human"
+        title="Create a reporting quarter"
+        description="Start with the period name and dates. After it is created, the workspace will guide you to choose a source and upload the GST transaction file."
+        bodyClassName="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_240px]"
+      >
           <UploadPanel
             activePeriod={activePeriod}
             onCreatePeriod={onCreatePeriod}
@@ -180,8 +179,7 @@ export default function DataIngestionHub({
               <p><span className="font-semibold text-ink">3.</span> Resolve only the items that need human review</p>
             </div>
           </aside>
-        </div>
-      </section>
+      </WorkspaceCard>
     );
   }
 
@@ -429,19 +427,14 @@ function IngestionReadinessSummary({
   ];
 
   return (
-    <section className="panel overflow-hidden">
-      <div className="border-b border-line bg-[#FFFBF5] p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <span className="badge-system">Data Ingestion</span>
-            <h2 className="mt-3 text-xl font-semibold text-ink">Step 1: Data Ingestion Hub</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Choose only the sources needed for this GST filing. Supporting evidence improves validation but does not replace transaction data.</p>
-          </div>
-          <span className="rounded-md border border-[#1F2A44]/15 bg-white px-3 py-2 text-sm font-semibold text-ink">{overallStatus}</span>
-        </div>
-      </div>
-
-      <div className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+    <WorkspaceCard
+      badge="Data Ingestion"
+      badgeClass="badge-system"
+      title="Step 1: Data Ingestion Hub"
+      description="Choose only the sources needed for this GST filing. Supporting evidence improves validation but does not replace transaction data."
+      status={<span className="rounded-md border border-[#1F2A44]/15 bg-white px-3 py-2 text-sm font-semibold text-ink">{overallStatus}</span>}
+      bodyClassName="grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_330px]"
+    >
         <div>
           <div className="grid gap-3 md:grid-cols-4">
             {primaryMetrics.map(([label, value]) => (
@@ -483,8 +476,7 @@ function IngestionReadinessSummary({
             ))}
           </div>
         </div>
-      </div>
-    </section>
+    </WorkspaceCard>
   );
 }
 
@@ -510,19 +502,21 @@ function EmptySourceState({
   }, [focused, onFocusHandled]);
 
   return (
-    <section
+    <WorkspaceCard
       ref={panelRef}
-      className={`panel p-6 transition ${focused ? "ring-2 ring-[#F69D39]/60 ring-offset-2 ring-offset-warm" : ""}`}
+      title="Select transaction sources"
+      description="Start with one transaction source. Supporting evidence can be added separately and does not replace transaction data."
+      badge="Source Selection"
+      badgeClass="badge-system"
+      status={<span className="rounded-md border border-[#F69D39]/35 bg-[#FFF5E5] px-3 py-2 text-sm font-semibold text-[#9A4F10]">Awaiting source</span>}
+      focused={focused}
     >
-      <div className="mx-auto max-w-3xl text-center">
-        <h2 className="text-xl font-semibold text-ink">Choose how you want to ingest GST data</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Start with one or more sources. You can add more later.</p>
-      </div>
       <SourceSelector selectedIds={draftSelectedSourceIds} onChange={setDraftSelectedSourceIds} />
-      <div className="mt-5 flex flex-wrap justify-center gap-3">
-        <button className="button-secondary" disabled={!draftSelectedSourceIds.length} onClick={onContinue}>Continue with Selected Sources</button>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+        <p className="text-sm text-slate-600">{draftSelectedSourceIds.length ? `${draftSelectedSourceIds.length} source option selected.` : "Choose only the sources needed for this GST filing."}</p>
+        <button className="button-primary" disabled={!draftSelectedSourceIds.length} onClick={onContinue}>Continue with selected sources</button>
       </div>
-    </section>
+    </WorkspaceCard>
   );
 }
 
@@ -532,19 +526,26 @@ function SourceSelector({ selectedIds, onChange }: { selectedIds: SourceId[]; on
   }
 
   return (
-    <div className="mt-5 grid gap-3 lg:grid-cols-5">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       {sourceCatalog.map((source) => (
         <button
           key={source.id}
-          className={`rounded-md border p-4 text-left transition ${selectedIds.includes(source.id) ? "border-accent bg-surface" : "border-line bg-white hover:bg-warm"}`}
+          className={`min-h-32 rounded-md border p-4 text-left transition ${
+            selectedIds.includes(source.id) ? "border-[#F69D39] bg-[#FFF5E5] shadow-soft" : "border-line bg-white hover:border-[#E0C375] hover:bg-[#FFF9EE]"
+          }`}
           onClick={() => toggle(source.id)}
         >
-          <div className="flex items-start gap-3">
-            <input type="checkbox" checked={selectedIds.includes(source.id)} readOnly />
-            <div>
+          <div className="flex h-full flex-col justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className={`mt-0.5 grid h-5 w-5 place-items-center rounded border text-xs font-bold ${
+                selectedIds.includes(source.id) ? "border-[#F69D39] bg-[#F69D39] text-white" : "border-line bg-white text-transparent"
+              }`}>✓</span>
+              <div>
               <p className="text-sm font-semibold text-ink">{source.title}</p>
               <p className="mt-2 text-xs leading-5 text-slate-600">{source.description}</p>
+              </div>
             </div>
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted">{transactionSourceIds.includes(source.id) ? "Transaction source" : "Evidence layer"}</p>
           </div>
         </button>
       ))}
@@ -584,29 +585,23 @@ function SourceShell({ source, onRemove, children, focused }: { source: Ingestio
   }, [focused]);
 
   return (
-    <section
+    <WorkspaceCard
       ref={shellRef}
-      className={`panel p-5 transition ${focused ? "ring-2 ring-[#F69D39]/60 ring-offset-2 ring-offset-warm" : ""}`}
+      badge={source.owner}
+      badgeClass={source.owner === "Human" ? "badge-human" : "badge-system"}
+      title={source.name}
+      description={source.type}
+      status={<span className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-ink">{source.status}</span>}
+      actions={<button className="button-secondary px-2 py-1 text-xs" onClick={onRemove}>{source.status === "Imported" ? "Mark inactive" : "Remove"}</button>}
+      focused={focused}
+      bodyClassName="p-5"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{source.owner}</span>
-          <h3 className="mt-3 text-lg font-semibold text-ink">{source.name}</h3>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{source.type}</p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <span className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink">{source.status}</span>
-          <button className="text-xs font-semibold text-slate-500 hover:text-risk" onClick={onRemove}>
-            {source.status === "Imported" ? "Mark inactive" : "Remove source"}
-          </button>
-        </div>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-        <p className="text-slate-500">Record count <span className="font-semibold text-ink">{source.recordCount}</span></p>
-        <p className="text-slate-500">Last updated <span className="font-semibold text-ink">{source.lastUpdated}</span></p>
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <p className="rounded-md border border-line bg-slate-50 p-3 text-slate-500">Record count<br /><span className="font-semibold text-ink">{source.recordCount}</span></p>
+        <p className="rounded-md border border-line bg-slate-50 p-3 text-slate-500">Last updated<br /><span className="font-semibold text-ink">{source.lastUpdated}</span></p>
       </div>
       <div className="mt-4">{children}</div>
-    </section>
+    </WorkspaceCard>
   );
 }
 
@@ -759,8 +754,12 @@ function EvidenceTable({ documents, onLinkEvidence, onOcr, onMarkValid, onReject
 
 function SourcePipelineStatus({ rows }: { rows: IngestionBatch[] }) {
   return (
-    <section className="panel p-5">
-      <h3 className="text-lg font-semibold text-ink">Source-to-Pipeline Visibility</h3>
+    <WorkspaceCard
+      badge="System Control"
+      badgeClass="badge-system"
+      title="Source-to-Pipeline Visibility"
+      description="Tracks how selected sources move into standardized GST-ready records."
+    >
       <div className="mt-4 grid gap-2">
         {rows.map((row) => (
           <div key={row.batch_id} className="grid gap-2 rounded-md border border-line p-3 text-sm md:grid-cols-4">
@@ -771,6 +770,6 @@ function SourcePipelineStatus({ rows }: { rows: IngestionBatch[] }) {
           </div>
         ))}
       </div>
-    </section>
+    </WorkspaceCard>
   );
 }
